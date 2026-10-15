@@ -1,0 +1,33 @@
+data_dir: akshare/hs300
+provider_dir: data/qlib/hs300
+cache_dir: data/alpha158
+output_dir: outputs/baseline
+research_start: '2008-01-01'
+research_end: '2026-09-18'
+train_start: '2008-01-01'
+first_test_month: '2026-04-01'
+download_start: '1990-01-01'
+download_end: null
+download:
+  membership_workers: 4
+  timeout: 30
+  retries: 3
+  pause: 0.2
+qlib:
+  kernels: 1
+model:
+  loss: mse
+  num_boost_round: 1000
+  early_stopping_rounds: 0
+  learning_rate: 0.2
+  colsample_bytree: 0.8879
+  subsample: 0.8789
+  lambda_l1: 205.6999
+  lambda_l2: 580.9768
+  max_depth: 8
+  num_leaves: 210
+  num_threads: 2
+  seed: 42
+  deterministic: true
+  force_col_wise: true
+  histogram_pool_size: 128
