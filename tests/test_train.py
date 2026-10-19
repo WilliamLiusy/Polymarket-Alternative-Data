@@ -4,15 +4,33 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from baseline.train import assemble_month, label_cutoff, monthly_windows, summarize_ic, _sha256, _verified_month
+from baseline.train import (
+    assemble_month, label_cutoff, monthly_windows, summarize_ic,
+    _sha256, _verified_month,
+)
 
 
 def settings():
     return {
         "train_start": "2025-01-01",
         "first_test_month": "2026-04-01",
-        "research_end": "2026-09-18",
+        "research_end": "2026-09-30",
     }
+
+
+@pytest.mark.parametrize("index_metadata", [
+    {}, {"index_policy": "complete_historical_membership"},
+    {"index_policy": "complete_historical_membership", "index_version": 0},
+    {"index_policy": "qlib_observed_rows", "index_version": 1},
+])
+def test_train_rejects_legacy_membership_cache_before_reading_provider(tmp_path, index_metadata):
+    from baseline.train import train
+
+    (tmp_path / "manifest.json").write_text(json.dumps({"fingerprint": "cached", **index_metadata}))
+    # No provider_dir is supplied: the stale cache must be rejected first.
+    config = {"cache_dir": str(tmp_path), "output_dir": str(tmp_path / "output"), "model": {"epochs": 10}}
+    with pytest.raises(ValueError, match="complete historical membership index; run prepare first"):
+        train(config)
 
 
 def test_monthly_training_expands_from_the_same_start():
@@ -27,8 +45,8 @@ def test_monthly_training_expands_from_the_same_start():
     assert windows[3]["label_available_end"] == "2026-06-30"
     assert windows[3]["train_end"] == "2026-06-26"
     assert windows[-1]["label_available_end"] == "2026-08-31"
-    assert windows[-1]["test_end"] == "2026-09-18"
-    assert windows[-1]["evaluation_end"] == "2026-09-16"
+    assert windows[-1]["test_end"] == "2026-09-30"
+    assert windows[-1]["evaluation_end"] == "2026-09-28"
 
 
 def test_purge_uses_market_calendar_including_holidays():
@@ -90,11 +108,11 @@ def test_last_month_keeps_predictions_but_masks_labels_beyond_project_end(tmp_pa
     calendar = pd.bdate_range("2025-01-01", "2026-10-01")
     window = monthly_windows(settings(), calendar)[-1]
     frame, raw = assemble_month(tmp_path, window)
-    late = frame.index.get_level_values("datetime") >= "2026-09-17"
+    late = frame.index.get_level_values("datetime") >= "2026-09-29"
     assert late.sum() == 4
     assert frame.loc[late, ("label", "LABEL0")].isna().all()
-    assert raw.loc[raw.index.get_level_values("datetime") >= "2026-09-17"].isna().all()
-    assert frame.index.get_level_values("datetime").max() == pd.Timestamp("2026-09-18")
+    assert raw.loc[raw.index.get_level_values("datetime") >= "2026-09-29"].isna().all()
+    assert frame.index.get_level_values("datetime").max() == pd.Timestamp("2026-09-30")
 
 
 def test_overall_ic_weights_days_not_months():
@@ -106,9 +124,9 @@ def test_overall_ic_weights_days_not_months():
 
 
 def test_resume_checks_fingerprint_and_artifact_hash(tmp_path):
-    artifact = tmp_path / "model.txt"
+    artifact = tmp_path / "model.pt"
     artifact.write_text("model")
-    (tmp_path / "completed.json").write_text(json.dumps({"fingerprint": "abc", "artifacts": {"model.txt": _sha256(artifact)}}))
+    (tmp_path / "completed.json").write_text(json.dumps({"fingerprint": "abc", "artifacts": {"model.pt": _sha256(artifact)}}))
     assert _verified_month(tmp_path, "abc")
     with pytest.raises(ValueError, match="different inputs"):
         _verified_month(tmp_path, "def")

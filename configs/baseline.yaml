@@ -3,31 +3,23 @@ provider_dir: data/qlib/hs300
 cache_dir: data/alpha158
 output_dir: outputs/baseline
 research_start: '2008-01-01'
-research_end: '2026-09-18'
+research_end: '2026-09-30'
 train_start: '2008-01-01'
 first_test_month: '2026-04-01'
 download_start: '1990-01-01'
 download_end: null
 download:
-  membership_workers: 4
+  membership_workers: 1  # BaoStock 串行查询，避免并发触发 IP 封禁
   timeout: 30
   retries: 3
   pause: 0.2
 qlib:
   kernels: 1
 model:
-  loss: mse
-  num_boost_round: 1000
-  early_stopping_rounds: 0
-  learning_rate: 0.2
-  colsample_bytree: 0.8879
-  subsample: 0.8789
-  lambda_l1: 205.6999
-  lambda_l2: 580.9768
-  max_depth: 8
-  num_leaves: 210
+  epochs: 10  # 手动设置；每月用全部已知标签历史从头训练这些轮数
+  batch_size: 512
+  hidden_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
   num_threads: 2
   seed: 42
-  deterministic: true
-  force_col_wise: true
-  histogram_pool_size: 128

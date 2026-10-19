@@ -17,6 +17,8 @@ LOG = logging.getLogger(__name__)
 LABEL = "Ref($close, -2)/Ref($close, -1) - 1"
 FIELDS = ("open", "close", "high", "low", "volume", "amount", "factor", "vwap")
 VERSION = 1
+CACHE_INDEX_POLICY = "complete_historical_membership"
+CACHE_INDEX_VERSION = 1
 
 
 def read_inputs(config: dict) -> tuple[pd.DatetimeIndex, dict[pd.Timestamp, set[str]]]:
@@ -174,15 +176,44 @@ def build_provider(config: dict, calendar: pd.DatetimeIndex, membership: dict,
         instrument_text = "".join("\t".join(row) + "\n" for row in membership_intervals(membership))
         for name in ("all", "csi300"):
             (staging / "instruments" / f"{name}.txt").write_text(instrument_text)
-        stock_lengths = {}
+        stock_lengths, zero_member_bars = {}, {}
         for code in sorted(set.union(*membership.values())):
-            bars = convert_bars(pd.read_csv(Path(config["data_dir"]) / "data" / f"{code}.csv"))
+            source = pd.read_csv(Path(config["data_dir"]) / "data" / f"{code}.csv")
+            bars = convert_bars(source)
             member_days = pd.DatetimeIndex([day for day, members in membership.items() if code in members])
             if not bars["close"].reindex(member_days).notna().any():
-                raise ValueError(f"Historical member {code} has no usable bars while it belongs to the index")
+                # A short membership interval can fall entirely inside a suspension.
+                # Require real usable observations on both sides, so a truncated
+                # warmup-only download still fails. Never turn bad OHLC into a halt.
+                valid_dates = bars.index[bars["close"].notna() & bars.index.isin(calendar)]
+                before = valid_dates[valid_dates < member_days.min()]
+                after = valid_dates[valid_dates > member_days.max()]
+                observed = source.loc[pd.to_datetime(source["日期"]).isin(member_days)]
+                prices = observed[["开盘", "收盘", "最高", "最低", "raw_close"]].apply(pd.to_numeric, errors="raise")
+                volume = pd.to_numeric(observed["成交量"], errors="raise")
+                amount = pd.to_numeric(observed["成交额"], errors="raise")
+                missing_or_suspended = observed.empty or (
+                    (np.isfinite(prices) & (prices > 0)).all().all()
+                    and volume.eq(0).all() and (np.isfinite(amount) & (amount >= 0)).all()
+                )
+                if before.empty or after.empty or not missing_or_suspended:
+                    raise ValueError(f"Historical member {code} has no usable bars while it belongs to the index")
+                zero_member_bars[code] = {
+                    "member_dates": member_days.strftime("%Y-%m-%d").tolist(),
+                    "last_usable_bar_before": before.max().strftime("%Y-%m-%d"),
+                    "first_usable_bar_after": after.min().strftime("%Y-%m-%d"),
+                    "zero_volume_rows": len(observed),
+                    "reason": "Only missing or valid zero-volume member observations; usable history brackets all member dates",
+                }
+                LOG.warning(
+                    "%s: retain %d member dates without usable bars, bracketed by %s and %s; keep original gaps",
+                    code, len(member_days), zero_member_bars[code]["last_usable_bar_before"],
+                    zero_member_bars[code]["first_usable_bar_after"],
+                )
             stock_lengths[code] = write_binary(bars, calendar, staging / "features" / code.lower())
         manifest = {"producer": "baseline.prepare", "version": VERSION,
-                    "fingerprint": fingerprint, "stock_lengths": stock_lengths}
+                    "fingerprint": fingerprint, "stock_lengths": stock_lengths,
+                    "zero_member_bars": zero_member_bars}
         (staging / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         if destination.exists():
             shutil.rmtree(destination)
@@ -194,7 +225,9 @@ def build_provider(config: dict, calendar: pd.DatetimeIndex, membership: dict,
 
 
 def _cache_complete(path: Path, manifest: dict, fingerprint: str, years: list[int]) -> bool:
-    if manifest.get("fingerprint") != fingerprint or manifest.get("years") != years:
+    if (manifest.get("fingerprint") != fingerprint or manifest.get("years") != years
+            or manifest.get("index_policy") != CACHE_INDEX_POLICY
+            or manifest.get("index_version") != CACHE_INDEX_VERSION):
         return False
     import pyarrow.parquet as pq
     for year in years:
@@ -224,19 +257,21 @@ def prepare(config: dict, refresh: bool = False) -> Path:
     start, end = pd.Timestamp(config["research_start"]), pd.Timestamp(config["research_end"])
     years = list(range(start.year, end.year + 1))
     cache = Path(config["cache_dir"])
-    cache_fingerprint = hashlib.sha256(f"{fingerprint}|{qlib.__version__}|{LABEL}|Alpha158|zscore-ddof1-v{VERSION}".encode()).hexdigest()
+    cache_identity = f"{fingerprint}|{qlib.__version__}|{LABEL}|Alpha158|zscore-ddof1-v{VERSION}|membership-index-v{CACHE_INDEX_VERSION}"
+    cache_fingerprint = hashlib.sha256(cache_identity.encode()).hexdigest()
     previous = read_manifest(cache / "manifest.json")
     if not refresh and _cache_complete(cache, previous, cache_fingerprint, years):
         LOG.info("Reuse Alpha158 cache %s", cache)
         return cache
     cache.mkdir(parents=True, exist_ok=True)
-    # No fitted feature normalization: LightGBM handles missing values natively.
+    # Keep raw features here; each monthly MLP fits normalization on its train segment.
     qlib.init(provider_uri=str(provider.resolve()), region="cn", kernels=1,
               expression_cache=None, dataset_cache=None)
     manifest = {"version": VERSION, "fingerprint": cache_fingerprint,
                 "provider_fingerprint": fingerprint, "research_start": str(start.date()),
                 "research_end": str(end.date()), "years": years, "label": LABEL,
-                "feature_count": 158, "year_files": {}}
+                "feature_count": 158, "index_policy": CACHE_INDEX_POLICY,
+                "index_version": CACHE_INDEX_VERSION, "year_files": {}}
     source_metadata = read_manifest(Path(config["data_dir"]) / "metadata.json")
     manifest["membership_source"] = source_metadata.get("membership_source", "local")
     manifest["membership_note"] = source_metadata.get("membership_note", "Local input without source metadata")
@@ -262,6 +297,13 @@ def prepare(config: dict, refresh: bool = False) -> Path:
         panel = panel.replace([np.inf, -np.inf], np.nan).astype("float32").sort_index()
         if panel.index.names != ["datetime", "instrument"]:
             panel = panel.reorder_levels(["datetime", "instrument"]).sort_index()
+        # Qlib can omit a member after its last source bar. Keep every actual
+        # historical member row; reindex adds only NaN features and labels.
+        member_index = pd.MultiIndex.from_tuples(
+            [(day, code) for day in sorted(membership) if begin <= day <= finish
+             for code in sorted(membership[day])], names=["datetime", "instrument"]
+        )
+        panel = panel.reindex(member_index)
         path = cache / f"{year}.parquet"
         temporary = cache / f".{year}.parquet.tmp"
         panel.to_parquet(temporary)

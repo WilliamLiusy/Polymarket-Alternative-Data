@@ -1,0 +1,24 @@
+# Keys are real market IDs. Copy this file and set classification.overrides_file.
+# Overrides are merged into rule-derived metadata, then validated.
+# Timestamps must describe the original contract, not the date of review.
+'REPLACE_WITH_MARKET_ID':
+  category: touch
+  side: high
+  threshold: 120
+  underlying: WTI
+  price_basis: cme:front_month:intraday_high
+  observation_start: '2026-06-01T00:00:00-04:00'
+  observation_end: '2026-07-01T00:00:00-04:00'
+  expires_at: '2026-07-01T00:00:00-04:00'
+
+# Open range tails use strings to retain standard JSON: lower: '-inf' / upper: 'inf'.
+# For historical highs set category: record and record_threshold from its rules.
+'REPLACE_WITH_EXCLUDED_MARKET_ID':
+  exclude: true
+
+# Direction times are the two scheduled price observations in the contract.
+# Use explicit timezones; never copy creation/opening or actual resolution time.
+'REPLACE_WITH_DIRECTION_MARKET_ID':
+  category: direction
+  observation_start: '2026-06-01T17:00:00-04:00'
+  observation_end: '2026-06-30T17:00:00-04:00'

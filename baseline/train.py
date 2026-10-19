@@ -1,4 +1,4 @@
-"""Monthly Qlib training on all available history before each test month."""
+"""Monthly fixed-epoch MLP training on all available historical labels."""
 
 from __future__ import annotations
 
@@ -135,16 +135,22 @@ def _verified_month(path: Path, fingerprint: str) -> bool:
 
 
 def train(config: dict, refresh: bool = False) -> dict:
-    """Train a fresh Qlib LightGBM per month and export cross-sectional IC."""
+    """Train a fresh Qlib MLP per month and export cross-sectional IC."""
+    from .__main__ import validate_training_config
+
+    validate_training_config(config)
     import qlib
+    import torch
     from qlib.constant import REG_CN
     from qlib.contrib.eva.alpha import calc_ic
-    from qlib.contrib.model.gbdt import LGBModel
     from qlib.data.dataset import DatasetH
     from qlib.data.dataset.handler import DataHandlerLP
     from qlib.workflow import R
     from qlib.workflow.record_temp import SigAnaRecord, SignalRecord
     from mlflow.tracking import MlflowClient
+
+    from .model import MLPModel
+    from .prepare import CACHE_INDEX_POLICY, CACHE_INDEX_VERSION
 
     cache_dir = Path(config["cache_dir"])
     output_dir = Path(config["output_dir"])
@@ -152,6 +158,9 @@ def train(config: dict, refresh: bool = False) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not manifest.get("fingerprint"):
         raise ValueError("Factor-cache manifest has no fingerprint; run prepare first")
+    if (manifest.get("index_policy") != CACHE_INDEX_POLICY
+            or manifest.get("index_version") != CACHE_INDEX_VERSION):
+        raise ValueError("Factor cache must use the complete historical membership index; run prepare first")
     provider_manifest = json.loads(
         (Path(config["provider_dir"]) / "manifest.json").read_text(encoding="utf-8")
     )
@@ -172,7 +181,8 @@ def train(config: dict, refresh: bool = False) -> dict:
         if year not in manifest["years"] or stat.st_size != manifest["year_files"][str(year)]["bytes"]:
             raise ValueError(f"Incomplete or modified factor cache {path}; run prepare first")
         cache_files.append((path.name, stat.st_size, stat.st_mtime_ns))
-    identity = {"training_scheme": "expanding_monthly", "config": config, "cache": manifest,
+    scheme = "expanding_monthly_fixed_epochs"
+    identity = {"model": "alpha158_mlp_v3", "training_scheme": scheme, "config": config, "cache": manifest,
                 "files": cache_files, "calendar": _sha256(calendar_path)}
     fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -197,30 +207,27 @@ def train(config: dict, refresh: bool = False) -> dict:
             started = time.monotonic()
             stage = output_dir / f".{window['month']}-{uuid.uuid4().hex[:8]}"
             stage.mkdir()
-            print(f"Training {window['month']}: {window['train_start']} to {window['train_end']} "
-                  f"(labels available by {window['label_available_end']})", flush=True)
+            # Include all historical rows whose T+2 labels are known before this month.
             frame, raw_label = assemble_month(cache_dir, window)
+            segments = {"train": (window["train_start"], window["train_end"]),
+                        "test": (window["test_start"], window["test_end"])}
             dates = frame.index.get_level_values("datetime")
-            train_mask = dates <= window["train_end"]
-            test_mask = dates >= window["test_start"]
-            actual = {"train": _date_range(frame.index[train_mask]), "test": _date_range(frame.index[test_mask])}
+            actual = {name: _date_range(frame.index[(dates >= start) & (dates <= end)])
+                      for name, (start, end) in segments.items()}
             handler = DataHandlerLP.from_df(frame)
-            dataset = DatasetH(
-                handler=handler,
-                segments={
-                    "train": (window["train_start"], window["train_end"]),
-                    "test": (window["test_start"], window["test_end"]),
-                },
-            )
-            model = LGBModel(**config["model"])
+            dataset = DatasetH(handler=handler, segments=segments)
             with R.start(
                 experiment_name="baseline_monthly",
                 recorder_name=window["month"],
                 uri=tracking_uri,
             ):
                 recorder = R.get_recorder()
-                R.log_params(month=window["month"], training_scheme="expanding_monthly",
+                R.log_params(month=window["month"], training_scheme=scheme,
+                             model_class="baseline.model.MLPModel",
                              fingerprint=fingerprint, **config["model"])
+                model = MLPModel(**config["model"])
+                print(f"Training MLP {window['month']}: {segments}, "
+                      f"epochs={model.epochs}", flush=True)
                 model.fit(dataset)
                 R.save_objects(**{"model.pkl": model, "raw_label.pkl": raw_label.to_frame()})
                 SignalRecord(model, dataset, recorder).generate()
@@ -234,20 +241,25 @@ def train(config: dict, refresh: bool = False) -> dict:
                 metrics = summarize_ic(daily)
                 metrics.update({"month": window["month"], "prediction_samples": len(predictions)})
                 metadata = {
-                    "training_scheme": "expanding_monthly",
+                    "training_scheme": scheme,
+                    "model_class": "baseline.model.MLPModel",
+                    "architecture": "Alpha158 + MLP",
                     "fingerprint": fingerprint,
                     "cache_fingerprint": manifest["fingerprint"],
                     "membership_source": manifest.get("membership_source"),
                     "membership_note": manifest.get("membership_note"),
                     "window": window,
+                    "segments": segments,
                     "actual": actual,
                     "model": config["model"],
+                    "trained_epochs": model.trained_epochs,
                     "recorder_id": recorder.id,
                     "seconds": time.monotonic() - started,
                     "process_peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
                 }
                 model.to_pickle(stage / "model.pkl")
-                model.model.save_model(str(stage / "model.txt"))
+                torch.save(model.network.state_dict(), stage / "model.pt")
+                pd.DataFrame(model.history).to_csv(stage / "training_history.csv", index=False)
                 predictions.to_parquet(stage / "predictions.parquet")
                 daily.to_csv(stage / "daily_ic.csv", index_label="datetime")
                 _write_json(stage / "metrics.json", metrics)
@@ -270,7 +282,7 @@ def train(config: dict, refresh: bool = False) -> dict:
     daily = pd.concat(daily_parts)
     predictions = pd.concat(prediction_parts)
     summary = summarize_ic(daily)
-    summary.update({"training_scheme": "expanding_monthly", "fingerprint": fingerprint,
+    summary.update({"training_scheme": scheme, "model_class": "baseline.model.MLPModel", "fingerprint": fingerprint,
                     "months": len(monthly), "prediction_samples": len(predictions),
                     "membership_source": manifest.get("membership_source"),
                     "membership_note": manifest.get("membership_note")})

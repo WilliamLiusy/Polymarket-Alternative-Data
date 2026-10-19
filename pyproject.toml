@@ -1,18 +1,20 @@
 [project]
 name = "polymarket-alternative-data"
 version = "0.1.0"
-description = "Historical CSI 300 Alpha158 and LightGBM research baseline"
+description = "Qlib Alpha158 MLP baseline and Polymarket oil factor extension"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "akshare==1.19.1",
   "baostock==0.9.4",
   "pyqlib==0.9.7",
-  "lightgbm==4.7.0",
   "numpy>=1.26,<3",
   "pandas>=2.2,<3",
   "pyarrow>=18",
   "PyYAML>=6",
   "psutil>=6",
+  "polymarket-client==0.13.0",
+  "torch>=2.6,<3",
+  "pandas-market-calendars==5.4.0",
 ]
 
 [dependency-groups]
@@ -21,3 +23,11 @@ dev = ["pytest>=8,<10"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

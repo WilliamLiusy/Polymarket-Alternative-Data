@@ -1,0 +1,36 @@
+data_dir: data/polymarket
+panel_dir: data/polymarket_factors
+calendar_path: akshare/hs300/calendar.txt
+baseline_config: configs/baseline.yaml
+output_dir: outputs/polymarket
+research_start: '2008-01-01'
+research_end: '2026-09-30'
+
+collection:
+  # null events_file: collect from Gamma (including closed markets).
+  # Can instead import an existing complete Gamma JSON array / JSONL catalog.
+  events_file: null
+  # Official oil-tag catalog; null scans the entire site instead.
+  event_tag_slug: oil
+  timeout: 30
+  retries: 3
+  pause: 0.15
+  workers: 16
+  event_page_size: 100
+  trade_page_size: 1000
+  price_page_size: 10000
+  price_chunk_days: 15
+
+classification:
+  overrides_file: null
+
+# No synthetic prices or probabilities. Quotes older than this are missing.
+# null accepts the last pre-close quote while the market remains valid.
+max_quote_age: '24h'
+negative_mass_tolerance: 0.00000001
+
+# Inherit fixed model.epochs and common MLP settings from baseline_config.
+# Each month trains once on all historical samples whose labels are known.
+# Explicit overrides here are supported and recorded in run.json.
+model:
+  sensitivity_l2: 0.001

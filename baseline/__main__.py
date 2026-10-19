@@ -9,6 +9,22 @@ from pathlib import Path
 import yaml
 
 
+def validate_training_config(config):
+    """Require an explicit fixed-epoch protocol without legacy holdout options."""
+    if "validation_months" in config:
+        raise ValueError("已取消验证集；请删除 validation_months，直接设置 model.epochs")
+    model = config.setdefault("model", {})
+    allowed = {"epochs", "batch_size", "hidden_size", "learning_rate", "weight_decay",
+               "seed", "num_threads"}
+    unknown = set(model) - allowed
+    if unknown:
+        raise ValueError(f"MLP 不支持这些模型参数：{', '.join(sorted(unknown))}；"
+                         "请删除旧参数，直接设置 model.epochs")
+    epochs = model.setdefault("epochs", 10)
+    if type(epochs) is not int or epochs <= 0:
+        raise ValueError("model.epochs 必须是正整数")
+
+
 def load_config(path):
     with Path(path).open(encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
@@ -32,13 +48,12 @@ def load_config(path):
                          "first_test_month ≤ research_end ≤ download_end")
     if date.fromisoformat(config["first_test_month"]).day != 1:
         raise ValueError("first_test_month 必须是测试月第一天")
-    if config["model"].get("early_stopping_rounds") != 0:
-        raise ValueError("本实验没有验证集，early_stopping_rounds 必须为 0")
+    validate_training_config(config)
     return config
 
 
 def main():
-    parser = argparse.ArgumentParser(description="历史沪深300 Qlib 月度扩展窗口 baseline")
+    parser = argparse.ArgumentParser(description="历史沪深300 Qlib MLP 月度扩展窗口 baseline")
     parser.add_argument("command", choices=("download", "prepare", "train", "all"))
     parser.add_argument("--config", default="configs/baseline.yaml")
     parser.add_argument("--refresh", action="store_true", help="重新生成指定阶段的缓存和产物")
