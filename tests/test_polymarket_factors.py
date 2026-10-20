@@ -268,6 +268,7 @@ def test_direction_time_factors_use_calendar_seconds_without_requiring_a_quote()
     result = compute_factors(align_prices(pd.DataFrame([item]), pd.DataFrame(), days), days)
     assert CATEGORY_FACTORS["direction"] == (
         "PROB", "ENTROPY", "DIRECTION_SCORE", "DIRECTION_CERTAINTY", "WINDOW_LENGTH", "TIME_TO_END",
+        "H1", "H3", "H6",
     )
     assert result.loc[0, list(CATEGORY_FACTORS["direction"][:4])].isna().all()
     assert result.loc[0, "WINDOW_LENGTH"] == pytest.approx(np.log(3))
@@ -461,7 +462,7 @@ def test_prepare_direction_times_cross_research_end_and_reject_legacy_catalog(tm
     assert result["PROB"].isna().all()
     np.testing.assert_allclose(result["WINDOW_LENGTH"], np.log1p(30))
     np.testing.assert_allclose(result["TIME_TO_END"], np.log1p(np.array([41, 17]) / 24))
-    assert json.loads((path / "manifest.json").read_text())["version"] == 3
+    assert json.loads((path / "manifest.json").read_text())["version"] == 4
     # A previously created panel cannot bypass reclassification of old timestamps.
     item.pop("time_extraction_version")
     catalog.write_text(json.dumps(item) + "\n")

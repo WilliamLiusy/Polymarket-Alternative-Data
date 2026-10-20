@@ -73,7 +73,7 @@ def train(config: dict, refresh: bool = False) -> dict:
         cache_files.append((path.name, stat.st_size, stat.st_mtime_ns))
     identity = {"config": config, "baseline": baseline, "cache": manifest["fingerprint"],
                 "cache_files": cache_files, "panel": _sha256(panel_path), "calendar": _sha256(calendar_path),
-                "model": "joint_gated_mlp_v5", "model_config": model_config,
+                "model": "joint_gated_mlp_v6", "model_config": model_config,
                 "input_schema_version": extension_mlp.INPUT_SCHEMA_VERSION,
                 "training_scheme": "expanding_monthly_fixed_epochs",
                 "model_sources": {"shared": _sha256(Path(shared_mlp.__file__)),

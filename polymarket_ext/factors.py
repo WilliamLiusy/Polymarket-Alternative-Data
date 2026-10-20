@@ -10,7 +10,17 @@ import numpy as np
 import pandas as pd
 
 LOG = logging.getLogger(__name__)
-VERSION = 3
+VERSION = 4
+# Fixed elapsed-hour lookbacks. Each limit applies to both resolution and age
+# at each endpoint; hourly age is measured from availability, not bucket start.
+HOURLY_LIMITS = {1: 3600, 3: 10800, 6: 10800}
+HOURLY_FACTORS = {
+    category: tuple(f"{prefix}H{hours}" for prefix in prefixes for hours in HOURLY_LIMITS)
+    for category, prefixes in {
+        "direction": ("",), "threshold": ("",), "touch": ("HIGH_", "LOW_"),
+        "range": ("",), "record": ("HIGH_",),
+    }.items()
+}
 CATEGORY_FACTORS = {
     "direction": ("PROB", "ENTROPY", "DIRECTION_SCORE", "DIRECTION_CERTAINTY",
                   "WINDOW_LENGTH", "TIME_TO_END"),
@@ -21,6 +31,8 @@ CATEGORY_FACTORS = {
     "range": ("PROB", "D1", "D5", "RANGE_REL_WIDTH", "RANGE_REL_DENSITY"),
     "record": ("HIGH_PROB", "HIGH_D1", "HIGH_D5", "ENTROPY"),
 }
+CATEGORY_FACTORS = {category: factors + HOURLY_FACTORS[category]
+                    for category, factors in CATEGORY_FACTORS.items()}
 FACTOR_COLUMNS = tuple(dict.fromkeys(name for names in CATEGORY_FACTORS.values() for name in names))
 TIME_COLUMNS = ("opened_at", "closed_at", "metadata_available_at", "observation_start",
                 "observation_end", "expires_at")
@@ -45,6 +57,54 @@ def _timestamps(values: pd.Series) -> pd.Series:
     return pd.to_datetime(values, format="mixed", utc=True, errors="coerce")
 
 
+def _active_at(row: dict, cutoffs) -> np.ndarray:
+    active = np.asarray((cutoffs >= row["opened_at"]) & (cutoffs >= row["metadata_available_at"]))
+    for column in ("observation_end", "expires_at", "closed_at"):
+        if pd.notna(row[column]):
+            active &= np.asarray(cutoffs < row[column])
+    return active
+
+
+def _match_quotes(targets: pd.DataFrame, quotes: pd.DataFrame | None) -> pd.DataFrame:
+    """Backward as-of selection, before any price/age/resolution validation."""
+    if quotes is not None and not quotes.empty:
+        return pd.merge_asof(targets, quotes, left_on="cutoff", right_on="quote_available_at",
+                             direction="backward")
+    frame = targets.copy()
+    for column in ("quote_time", "quote_available_at"):
+        frame[column] = pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns, UTC]")
+    frame["price"] = np.nan
+    frame["quote_resolution_seconds"] = np.nan
+    frame["quote_source"] = pd.Series(pd.NA, index=frame.index, dtype="string")
+    return frame
+
+
+def _hourly_endpoints(targets: pd.DataFrame, quotes: pd.DataFrame | None, row: dict,
+                      current: pd.DataFrame) -> pd.DataFrame:
+    """Keep raw endpoint evidence, including invalid prices and inactive lags."""
+    columns = {}
+    for hours in (0, *HOURLY_LIMITS):
+        shifted = targets.copy()
+        shifted["cutoff"] -= pd.Timedelta(hours=hours)
+        endpoint = current if hours == 0 else _match_quotes(shifted, quotes)
+        for name in ("cutoff", "price", "quote_time", "quote_available_at",
+                     "quote_resolution_seconds", "quote_source"):
+            columns[f"hourly_{hours}h_{name}"] = endpoint[name]
+        columns[f"hourly_{hours}h_age_seconds"] = (
+            endpoint["cutoff"] - endpoint["quote_available_at"]).dt.total_seconds()
+        columns[f"hourly_{hours}h_market_active"] = _active_at(row, endpoint["cutoff"])
+    return pd.DataFrame(columns, index=targets.index)
+
+
+def _hourly_probability(panel: pd.DataFrame, hours: int, limit: int) -> pd.Series:
+    prefix = f"hourly_{hours}h_"
+    price = panel[prefix + "price"]
+    resolution = panel[prefix + "quote_resolution_seconds"]
+    valid = (panel[prefix + "market_active"] & price.between(0, 1)
+             & resolution.between(0, limit) & panel[prefix + "age_seconds"].between(0, limit))
+    return price.where(valid)
+
+
 def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.DatetimeIndex,
                  max_quote_age=None) -> pd.DataFrame:
     """Use the latest available observation at 15:00 Beijing, retaining missing quotes.
@@ -56,7 +116,9 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
     Data v2 aggregate timestamps mark bucket starts, so those observations only
     become available at bucket end. Exact ticks, CLOB observations and local
     histories without a source retain their original observation timestamps.
-    ``max_quote_age`` accepts a timedelta string or a number of seconds.
+    ``max_quote_age`` accepts a timedelta string or a number of seconds and
+    affects daily quotes only. Hourly endpoints retain raw evidence for their
+    independent resolution/availability-age limits in ``compute_factors``.
     """
     days = _calendar(calendar)
     cutoffs = (days.tz_localize("Asia/Shanghai") + pd.Timedelta(hours=15)).tz_convert("UTC")
@@ -103,21 +165,13 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
         opened, available = row["opened_at"], row["metadata_available_at"]
         if pd.isna(opened) or pd.isna(available):
             continue
-        active = (cutoffs >= opened) & (cutoffs >= available)
-        for column in ("observation_end", "expires_at", "closed_at"):
-            if pd.notna(row[column]):
-                active &= cutoffs < row[column]
+        active = _active_at(row, cutoffs)
         if not active.any():
             continue
-        frame = pd.DataFrame({"datetime": days[active], "cutoff": cutoffs[active]})
+        targets = pd.DataFrame({"datetime": days[active], "cutoff": cutoffs[active]})
         token_history = histories.get(row["token_id"])
-        if token_history is None or token_history.empty:
-            frame["quote_time"] = pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns, UTC]")
-            frame["quote_available_at"] = pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns, UTC]")
-            frame["price"] = np.nan
-            frame["quote_resolution_seconds"] = np.nan
-            frame["quote_source"] = pd.Series(pd.NA, index=frame.index, dtype="string")
-        else:
+        quotes = None
+        if token_history is not None and not token_history.empty:
             quotes = token_history[["timestamp", "quote_available_at", "price", "resolution_seconds", "source"]].rename(
                 columns={"timestamp": "quote_time", "resolution_seconds": "quote_resolution_seconds",
                          "source": "quote_source"})
@@ -127,13 +181,15 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
             # Keep only updates to the latest observation known at each arrival.
             quotes = quotes.loc[quotes["quote_time"].eq(quotes["quote_time"].cummax())]
             quotes = quotes.drop_duplicates("quote_available_at", keep="last")
-            frame = pd.merge_asof(frame, quotes, left_on="cutoff", right_on="quote_available_at", direction="backward")
+        frame = _match_quotes(targets, quotes)
+        hourly = _hourly_endpoints(targets, quotes, row, frame)
         frame["quote_age_seconds"] = (frame["cutoff"] - frame["quote_time"]).dt.total_seconds()
         valid = frame["price"].between(0, 1) & frame["quote_time"].notna()
         if age is not None:
             valid &= frame["quote_age_seconds"] <= age.total_seconds()
         frame["probability"] = frame["price"].where(valid)
         frame["quote_valid"] = valid
+        frame = pd.concat([frame, hourly], axis=1)
         for name, value in row.items():
             # Preserve list/dict metadata as objects, should callers supply any.
             frame[name] = [value] * len(frame)
@@ -147,7 +203,9 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
             empty[column] = pd.Series(dtype=float)
         empty["quote_valid"] = pd.Series(dtype=bool)
         empty["quote_source"] = pd.Series(dtype="string")
-        return empty
+        row = dict.fromkeys(TIME_COLUMNS, pd.NaT)
+        hourly = _hourly_endpoints(empty[["datetime", "cutoff"]], None, row, empty)
+        return pd.concat([empty, hourly], axis=1)
     return pd.concat(frames, ignore_index=True).sort_values(["datetime", "market_id"]).reset_index(drop=True)
 
 
@@ -220,6 +278,12 @@ def compute_factors(aligned: pd.DataFrame, calendar: pd.DatetimeIndex,
         result.loc[mask, f"{prefix}_PROB"] = p
         result.loc[mask, f"{prefix}_D1"] = d1
     result.loc[category == "record", "HIGH_D5"] = d5
+
+    for hours, limit in HOURLY_LIMITS.items():
+        change = _hourly_probability(result, 0, limit) - _hourly_probability(result, hours, limit)
+        result.loc[category.isin(["direction", "threshold", "range"]), f"H{hours}"] = change
+        result.loc[highs, f"HIGH_H{hours}"] = change
+        result.loc[lows, f"LOW_H{hours}"] = change
 
     grouped = result.groupby(["datetime", *GROUP_COLUMNS], sort=False, dropna=False)
     for _, group in grouped:
@@ -329,6 +393,7 @@ def prepare(config: dict, refresh: bool = False) -> Path:
         "version": VERSION, "start": str(start), "end": str(end),
         "max_quote_age": config.get("max_quote_age"),
         "negative_mass_tolerance": config.get("negative_mass_tolerance", 1e-8),
+        "hourly_limits_seconds": HOURLY_LIMITS, "hourly_age_basis": "quote_available_at",
     }, sort_keys=True).encode())
     for path in [calendar_path, records_path, *status_files, *files]:
         digest.update(str(path).encode())
@@ -379,6 +444,7 @@ def prepare(config: dict, refresh: bool = False) -> Path:
         "catalog_markets": catalog_markets, "markets": len(markets),
         "rows": len(factors), "valid_quotes": int(aligned["quote_valid"].sum()),
         "factor_columns": list(FACTOR_COLUMNS), "files": sizes,
+        "hourly_limits_seconds": HOURLY_LIMITS, "hourly_age_basis": "quote_available_at",
         "category_rows": factors["category"].value_counts().to_dict(),
         "source_warnings": source_warnings, "markets_without_collection_metadata": missing_coverage,
         "metadata_vintage_limitation": (
@@ -396,6 +462,15 @@ def prepare(config: dict, refresh: bool = False) -> Path:
             "trading_days_with_quotes": int(quoted["datetime"].nunique()),
         }
     manifest["category_coverage"] = coverage
+    manifest["hourly_coverage"] = {
+        category: {
+            factor: {"valid_rows": len(valid), "markets": int(valid["market_id"].nunique()),
+                     "trading_days": int(valid["datetime"].nunique())}
+            for factor in HOURLY_FACTORS[category]
+            for valid in [factors.loc[(factors["category"] == category) & np.isfinite(factors[factor])]]
+        }
+        for category in CATEGORY_FACTORS
+    }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     LOG.info("Prepared %s market/day rows from %s markets", len(factors), len(markets))
     return panel_dir

@@ -11,7 +11,7 @@ from qlib.data.dataset import DatasetH
 from qlib.data.dataset.handler import DataHandlerLP
 
 from polymarket_ext.__main__ import load_config, validate_training_config
-from polymarket_ext.factors import CATEGORY_FACTORS, VERSION as FACTOR_VERSION
+from polymarket_ext.factors import CATEGORY_FACTORS, HOURLY_FACTORS, VERSION as FACTOR_VERSION
 from polymarket_ext.model import CATEGORIES, INPUT_SCHEMA_VERSION, GatedSetNetwork, PolymarketModel
 from polymarket_ext.train import train
 
@@ -177,8 +177,9 @@ def test_direction_time_factors_keep_five_encoders_and_default_head_width():
     assert network.sensitivities.weight.shape == (3, 5)
     assert CATEGORY_FACTORS["direction"] == (
         "PROB", "ENTROPY", "DIRECTION_SCORE", "DIRECTION_CERTAINTY", "WINDOW_LENGTH", "TIME_TO_END",
+        "H1", "H3", "H6",
     )
-    assert network.encoders[CATEGORIES.index("direction")][0].in_features == 12
+    assert network.encoders[CATEGORIES.index("direction")][0].in_features == 18
     assert network.head[0].in_features == 328
 
 
@@ -299,8 +300,8 @@ def test_batches_keep_unquoted_rows_metadata_factors_and_nonfinite_masks():
     model.feature_names, model.alpha_mean, model.alpha_scale = ["X"], np.array([0.]), np.array([1.])
     model._initialize_network(frame.loc[:segments["train"][1]])
     assert len(model.factor_panel) == len(panel)
-    np.testing.assert_allclose(model.factor_mean["direction"], [2 / 3, 1, 1, 1, 1, 1])
-    np.testing.assert_array_equal(model.factor_mean["threshold"], np.zeros(5))
+    np.testing.assert_allclose(model.factor_mean["direction"], [2 / 3, 1, 1, 1, 1, 1, 1, 1, 1])
+    np.testing.assert_array_equal(model.factor_mean["threshold"], np.zeros(len(CATEGORY_FACTORS["threshold"])))
     features = frame["feature"].iloc[::2]
     _, _, markets = model._batch(model._arrays(features), np.arange(6))
     values, missing, present = markets[CATEGORIES.index("direction")]
@@ -311,7 +312,7 @@ def test_batches_keep_unquoted_rows_metadata_factors_and_nonfinite_masks():
     torch.testing.assert_close(missing[1, 0], torch.zeros(len(direction)))
     torch.testing.assert_close(missing[1, 1], torch.ones(len(direction)))
     torch.testing.assert_close(missing[2], torch.ones((2, len(direction))))
-    torch.testing.assert_close(missing[4, 0], torch.tensor([0., 1., 1., 1., 1., 1.]))
+    torch.testing.assert_close(missing[4, 0], torch.tensor([0., 1., 1., 1., 1., 1., 1., 1., 1.]))
     assert torch.isfinite(values).all()
     assert torch.all(values[missing.bool()] == 0)
     _, threshold_missing, threshold_present = markets[CATEGORIES.index("threshold")]
@@ -348,7 +349,7 @@ def test_early_missing_training_and_mixed_inference_survive_pickle(tmp_path):
     dataset = DatasetH(handler=DataHandlerLP.from_df(frame), segments=segments)
     model = PolymarketModel(panel, epochs=2, batch_size=4, hidden_size=4, num_threads=1)
     model.fit(dataset)
-    assert model.input_schema_version == INPUT_SCHEMA_VERSION == 2
+    assert model.input_schema_version == INPUT_SCHEMA_VERSION == 3
     assert model.training_coverage["active_market_rows"] == 0
     assert all(value == 6 for value in model.training_coverage["category_missing_days"].values())
     np.testing.assert_array_equal(model.sensitivity_frame(), np.ones((2, 5)))
@@ -370,7 +371,7 @@ def test_unquoted_direction_markets_learn_from_different_horizons_and_survive_pi
     panel = pd.DataFrame([
         {"datetime": date, "category": "direction", "market_id": f"{horizon}-{day}",
          "quote_valid": False,
-         **dict.fromkeys(CATEGORY_FACTORS["direction"][:4], np.nan),
+         **dict.fromkeys(CATEGORY_FACTORS["direction"], np.nan),
          "WINDOW_LENGTH": np.log1p(horizon),
          "TIME_TO_END": np.log1p(remaining)}
         for day, date in enumerate(dates)
@@ -386,14 +387,14 @@ def test_unquoted_direction_markets_learn_from_different_horizons_and_survive_pi
     assert model.training_coverage["category_missing_days"]["direction"] == 0
     np.testing.assert_array_equal(model.factor_mean["direction"][:4], np.zeros(4))
     training_times = panel.loc[panel["datetime"] <= segments["train"][1], ["WINDOW_LENGTH", "TIME_TO_END"]]
-    np.testing.assert_allclose(model.factor_mean["direction"][4:], training_times.mean(), rtol=1e-6)
-    np.testing.assert_allclose(model.factor_scale["direction"][4:], training_times.std(ddof=0), rtol=1e-6)
+    np.testing.assert_allclose(model.factor_mean["direction"][4:6], training_times.mean(), rtol=1e-6)
+    np.testing.assert_allclose(model.factor_scale["direction"][4:6], training_times.std(ddof=0), rtol=1e-6)
     assert np.any(np.abs(model.sensitivity_frame()["direction"].to_numpy() - 1) > 1e-5)
 
     features = frame.loc[segments["test"][0]:, "feature"]
     batch = model._batch(model._arrays(features), np.arange(len(features)))
     values, missing, present = batch[2][CATEGORIES.index("direction")]
-    assert values.shape == (2, 2, 6)
+    assert values.shape == (2, 2, 9)
     torch.testing.assert_close(missing[..., :4], torch.ones((2, 2, 4)))
     torch.testing.assert_close(missing[..., 4], torch.zeros((2, 2)))
     torch.testing.assert_close(missing[..., 5], torch.tensor([[0., 1.], [0., 1.]]))
@@ -411,7 +412,7 @@ def test_unquoted_direction_markets_learn_from_different_horizons_and_survive_pi
     model.to_pickle(tmp_path / "horizon-model.pkl")
     with (tmp_path / "horizon-model.pkl").open("rb") as stream:
         restored = pickle.load(stream)
-    assert restored.input_schema_version == 2
+    assert restored.input_schema_version == 3
     pd.testing.assert_series_equal(restored.predict(dataset), prediction)
 
 
@@ -422,6 +423,7 @@ def test_range_with_only_missing_d5_remains_an_available_category():
         "datetime": date, "category": "range", "market_id": "new-range", "quote_valid": True,
         "PROB": 0.0, "D1": 0.0, "D5": np.nan,
         "RANGE_REL_WIDTH": 0.5, "RANGE_REL_DENSITY": 0.0,
+        "H1": 0.0, "H3": 0.0, "H6": 0.0,
     }])
     model = PolymarketModel(panel, hidden_size=4)
     model.feature_names, model.alpha_mean, model.alpha_scale = ["X"], np.array([0.]), np.array([1.])
@@ -445,7 +447,7 @@ def test_range_with_only_missing_d5_remains_an_available_category():
     torch.testing.assert_close(head_inputs[0][0, offset + model.hidden_size], torch.tensor(1.).log1p())
 
 
-@pytest.mark.parametrize("schema", [None, 1, INPUT_SCHEMA_VERSION + 1])
+@pytest.mark.parametrize("schema", [None, 1, 2, INPUT_SCHEMA_VERSION + 1])
 @pytest.mark.parametrize("operation", ["predict", "set_factor_panel", "sensitivity_frame"])
 def test_incompatible_fitted_models_require_explicit_retraining(schema, operation):
     frame, panel, segments = sample_data()
@@ -503,7 +505,7 @@ def test_qlib_fit_learns_sensitivities_without_test_statistics_and_serializes(tm
     changed_frame.loc[segments["test"][0], ("feature", "X")] = 1e6
     changed_panel = panel.copy()
     future = changed_panel["datetime"] == segments["test"][0]
-    changed_panel.loc[future, ["PROB", "WINDOW_LENGTH", "TIME_TO_END"]] = 1e6
+    changed_panel.loc[future, ["PROB", "WINDOW_LENGTH", "TIME_TO_END", "H1", "H3", "H6"]] = 1e6
     changed_panel.loc[future, "market_id"] = "brand-new-market"
     changed = PolymarketModel(changed_panel, epochs=3, batch_size=6, hidden_size=8,
                              learning_rate=0.02, num_threads=1)

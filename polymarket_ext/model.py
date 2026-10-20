@@ -16,11 +16,11 @@ from torch import nn
 
 from baseline.model import MLPModel, _normalization, build_mlp
 
-from .factors import CATEGORY_FACTORS
+from .factors import CATEGORY_FACTORS, HOURLY_FACTORS
 
 
 CATEGORIES = tuple(CATEGORY_FACTORS)
-INPUT_SCHEMA_VERSION = 2
+INPUT_SCHEMA_VERSION = 3
 REBUILD_INSTRUCTIONS = (
     "Rebuild inputs and retrain with `python -m polymarket_ext classify --refresh`, "
     "`python -m polymarket_ext download` (reuses downloaded history), "
@@ -105,6 +105,13 @@ class PolymarketModel(MLPModel):
                     f"Incompatible direction factor panel: missing {', '.join(sorted(missing))}. "
                     + REBUILD_INSTRUCTIONS
                 )
+        for category, factors in HOURLY_FACTORS.items():
+            missing = set(factors) - set(frame.columns)
+            if frame["category"].eq(category).any() and missing:
+                raise ValueError(
+                    f"Incompatible {category} hourly factor panel: missing {', '.join(sorted(missing))}. "
+                    + REBUILD_INSTRUCTIONS
+                )
         frame["datetime"] = pd.to_datetime(frame["datetime"]).dt.normalize()
         self.factor_panel = frame.sort_values(["datetime", "category", "market_id"]).reset_index(drop=True)
         if self.network is not None:
@@ -183,7 +190,7 @@ class PolymarketModel(MLPModel):
     def _check_input_schema(self) -> None:
         if getattr(self, "input_schema_version", None) != INPUT_SCHEMA_VERSION:
             raise ValueError(
-                "Incompatible Polymarket model input schema for interval direction factors. "
+                "Incompatible Polymarket model input schema for hourly factors. "
                 + REBUILD_INSTRUCTIONS
             )
 
