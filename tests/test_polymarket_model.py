@@ -1,3 +1,4 @@
+import copy
 import json
 import pickle
 
@@ -60,13 +61,114 @@ def test_all_market_factor_values_are_gated_before_pooling():
     output = network(torch.ones((1, 2)), torch.tensor([1]), markets)
     for index, inputs in enumerate(observed_inputs):
         width = len(CATEGORY_FACTORS[CATEGORIES[index]])
-        torch.testing.assert_close(inputs[..., :width], markets[index][0] * gates[index])
-        torch.testing.assert_close(inputs[..., width:], markets[index][1])
+        torch.testing.assert_close(inputs[..., :width], markets[index][0].reshape(-1, width) * gates[index])
+        torch.testing.assert_close(inputs[..., width:], markets[index][1].reshape(-1, width))
     output.sum().backward()
     assert torch.all(network.sensitivities.weight.grad[1] != 0)
     assert torch.all(network.sensitivities.weight.grad[0] == 0)
     for hook in hooks:
         hook.remove()
+
+
+def _dense_reference_forward(network, alpha, stocks, markets):
+    """Original implementation, including encoding every padded row."""
+    gates = network.sensitivities(stocks)
+    inputs = [alpha]
+    for category, (values, missing, present) in enumerate(markets):
+        scaled = values * gates[:, category, None, None]
+        encoded = network.encoders[category](torch.cat([scaled, missing], dim=-1))
+        count = present.sum(dim=1, keepdim=True)
+        pooled = (encoded * present[..., None]).sum(dim=1) / count.clamp(min=1)
+        available = ((missing == 0) & present[..., None].bool()).any(dim=2).any(dim=1, keepdim=True)
+        inputs.extend([pooled, count.log1p(), (~available).to(values.dtype)])
+    return network.head(torch.cat(inputs, dim=1)).squeeze(-1)
+
+
+def _comparison_batch(dtype):
+    markets = []
+    for category, width in zip(CATEGORIES, (4, 3, 2, 5, 1)):
+        values = torch.randn((6, width, len(CATEGORY_FACTORS[category])), dtype=dtype)
+        missing = (torch.rand(values.shape) < 0.4).to(dtype)
+        values[missing.bool()] = 0
+        present = torch.zeros((6, width), dtype=dtype)
+        present[1, :1] = 1  # A real market with all factors missing still enters the encoder.
+        values[1, 0] = 0
+        missing[1, 0] = 1
+        present[2, :1] = 1  # A real market with observed zero-valued factors.
+        values[2, 0] = 0
+        missing[2, 0] = 0
+        present[3, :min(width, 2)] = 1
+        present[4] = 1
+        present[5, -1] = 1  # Real rows need not be a contiguous prefix.
+        # Misleading finite padding must influence neither pooling nor availability.
+        values[~present.bool()] = 100
+        missing[~present.bool()] = 0
+        markets.append((values, missing, present))
+    return (torch.randn((6, 3), dtype=dtype), torch.tensor([0, 1, 2, 3, 2, 1]), markets)
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_sparse_encoding_matches_dense_predictions_and_all_parameter_gradients(dtype):
+    torch.manual_seed(103)
+    sparse = GatedSetNetwork(stock_count=3, alpha_size=3, hidden_size=8).to(dtype)
+    with torch.no_grad():
+        sparse.sensitivities.weight[1:].normal_()
+    dense = copy.deepcopy(sparse)
+    alpha, stocks, markets = _comparison_batch(dtype)
+    markets[2][2].zero_()  # An entire category can be absent from the batch.
+    encoded_rows = []
+    hooks = [encoder.register_forward_pre_hook(
+        lambda module, args: encoded_rows.append(len(args[0]))) for encoder in sparse.encoders]
+    actual = sparse(alpha, stocks, markets)
+    expected = _dense_reference_forward(dense, alpha, stocks, markets)
+    torch.testing.assert_close(actual, expected)
+    assert encoded_rows == [int(present.sum()) for _, _, present in markets]
+    (actual - 0.3).square().mean().backward()
+    (expected - 0.3).square().mean().backward()
+    for name, parameter in sparse.named_parameters():
+        reference = dict(dense.named_parameters())[name]
+        assert parameter.grad is not None, name
+        assert reference.grad is not None, name
+        torch.testing.assert_close(parameter.grad, reference.grad)
+    for hook in hooks:
+        hook.remove()
+
+
+def test_sparse_empty_categories_preserve_adam_momentum_and_weight_decay_updates():
+    torch.manual_seed(104)
+    sparse = GatedSetNetwork(stock_count=3, alpha_size=3, hidden_size=8).double()
+    dense = copy.deepcopy(sparse)
+
+    def optimizer(network):
+        return torch.optim.Adam([
+            {"params": [parameter for name, parameter in network.named_parameters()
+                        if name != "sensitivities.weight"], "weight_decay": 0.01},
+            {"params": network.sensitivities.parameters(), "weight_decay": 0},
+        ], lr=0.003)
+
+    sparse_optimizer, dense_optimizer = optimizer(sparse), optimizer(dense)
+    alpha, stocks, markets = _comparison_batch(torch.float64)
+    for step in range(2):
+        if step == 1:
+            # Every encoder has existing momentum when the next batch has no markets.
+            for _, _, present in markets:
+                present.zero_()
+        for network, network_optimizer, forward in (
+            (sparse, sparse_optimizer, sparse.forward),
+            (dense, dense_optimizer, lambda *batch: _dense_reference_forward(dense, *batch)),
+        ):
+            network_optimizer.zero_grad(set_to_none=True)
+            (forward(alpha, stocks, markets) - 0.3).square().mean().backward()
+            for name, parameter in network.named_parameters():
+                assert parameter.grad is not None, name
+                if step == 1 and name.startswith("encoders."):
+                    torch.testing.assert_close(parameter.grad, torch.zeros_like(parameter.grad))
+            network_optimizer.step()
+        for name, parameter in sparse.named_parameters():
+            torch.testing.assert_close(parameter, dict(dense.named_parameters())[name], rtol=1e-10, atol=1e-12)
+        for actual, expected in zip(sparse_optimizer.state.values(), dense_optimizer.state.values()):
+            for key in ("step", "exp_avg", "exp_avg_sq"):
+                torch.testing.assert_close(actual[key], expected[key], rtol=1e-10, atol=1e-12)
 
 
 def test_direction_time_factors_keep_five_encoders_and_default_head_width():
@@ -170,8 +272,8 @@ def test_partial_missing_masks_bypass_stock_sensitivities():
     network(torch.zeros((1, 1)), torch.tensor([1]), markets).sum().backward()
     hook.remove()
     width = len(CATEGORY_FACTORS[CATEGORIES[0]])
-    torch.testing.assert_close(encoder_inputs[0][..., :width], markets[0][0] * -2)
-    torch.testing.assert_close(encoder_inputs[0][..., width:], markets[0][1])
+    torch.testing.assert_close(encoder_inputs[0][..., :width], markets[0][0].reshape(-1, width) * -2)
+    torch.testing.assert_close(encoder_inputs[0][..., width:], markets[0][1].reshape(-1, width))
     assert network.sensitivities.weight.grad[1, 0] != 0
     torch.testing.assert_close(network.sensitivities.weight.grad[1, 1:], torch.zeros(len(CATEGORIES) - 1))
 

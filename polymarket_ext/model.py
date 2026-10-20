@@ -45,13 +45,25 @@ class GatedSetNetwork(nn.Module):
         gates = self.sensitivities(stocks)
         inputs = [alpha]
         for category, (values, missing, present) in enumerate(markets):
+            # Historical batches are mostly padding. Encode only real markets,
+            # including real rows whose factors are all missing, then scatter
+            # their embeddings back to the corresponding stock/date samples.
+            samples, positions = present.nonzero(as_tuple=True)
             # Missing values have been filled with zero; masks bypass the gates.
-            scaled = values * gates[:, category, None, None]
-            encoded = self.encoders[category](torch.cat([scaled, missing], dim=-1))
+            scaled = values[samples, positions] * gates[samples, category, None]
+            real_missing = missing[samples, positions]
+            # An empty input still traverses the encoder and autograd graph.
+            # Its parameters receive zero gradients rather than None, retaining
+            # Adam momentum and weight-decay behavior on entirely empty batches.
+            encoded = self.encoders[category](torch.cat([scaled, real_missing], dim=-1))
             count = present.sum(dim=1, keepdim=True)
-            pooled = (encoded * present[..., None]).sum(dim=1) / count.clamp(min=1)
-            available = ((missing == 0) & present[..., None].bool()).any(dim=2).any(dim=1, keepdim=True)
-            category_missing = (~available).to(values.dtype)
+            pooled = encoded.new_zeros((len(alpha), encoded.shape[-1])).index_add(
+                0, samples, encoded * present[samples, positions, None],
+            ) / count.clamp(min=1)
+            available = values.new_zeros(len(alpha)).index_add(
+                0, samples, (real_missing == 0).any(dim=1).to(values.dtype),
+            )
+            category_missing = (available == 0).to(values.dtype)[:, None]
             inputs.extend([pooled, count.log1p(), category_missing])
         return self.head(torch.cat(inputs, dim=1)).squeeze(-1)
 

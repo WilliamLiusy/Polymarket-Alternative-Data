@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 LOG = logging.getLogger(__name__)
-VERSION = 2
+VERSION = 3
 CATEGORY_FACTORS = {
     "direction": ("PROB", "ENTROPY", "DIRECTION_SCORE", "DIRECTION_CERTAINTY",
                   "WINDOW_LENGTH", "TIME_TO_END"),
@@ -47,12 +47,15 @@ def _timestamps(values: pd.Series) -> pd.Series:
 
 def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.DatetimeIndex,
                  max_quote_age=None) -> pd.DataFrame:
-    """Use the last observation at or before 15:00 Beijing, retaining missing quotes.
+    """Use the latest available observation at 15:00 Beijing, retaining missing quotes.
 
     A market becomes available at both its opening and metadata creation times.
     Quotes remain usable until the earliest observation end, expiry, or actual
     close. Forecasts before an observation window begins are allowed. The most
     recent invalid price is never replaced with an older, valid observation.
+    Data v2 aggregate timestamps mark bucket starts, so those observations only
+    become available at bucket end. Exact ticks, CLOB observations and local
+    histories without a source retain their original observation timestamps.
     ``max_quote_age`` accepts a timedelta string or a number of seconds.
     """
     days = _calendar(calendar)
@@ -82,7 +85,11 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
     history["token_id"] = history["token_id"].astype(str)
     history["price"] = pd.to_numeric(history["price"], errors="coerce")
     history["resolution_seconds"] = pd.to_numeric(history.get("resolution_seconds", np.nan), errors="coerce")
-    history = history.dropna(subset=["timestamp"]).sort_values("timestamp", kind="stable")
+    history["source"] = history.get("source", pd.Series(index=history.index, dtype=object)).astype("string")
+    resolution = history["resolution_seconds"]
+    delay = resolution.where(np.isfinite(resolution) & resolution.ge(0)).where(history["source"].eq("data_v2"), 0)
+    history["quote_available_at"] = history["timestamp"] + pd.to_timedelta(delay, unit="s")
+    history = history.dropna(subset=["timestamp", "quote_available_at"]).sort_values("timestamp", kind="stable")
     histories = {token: frame for token, frame in history.groupby("token_id", sort=False)}
     age = None
     if max_quote_age is not None:
@@ -106,13 +113,21 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
         token_history = histories.get(row["token_id"])
         if token_history is None or token_history.empty:
             frame["quote_time"] = pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns, UTC]")
+            frame["quote_available_at"] = pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns, UTC]")
             frame["price"] = np.nan
             frame["quote_resolution_seconds"] = np.nan
+            frame["quote_source"] = pd.Series(pd.NA, index=frame.index, dtype="string")
         else:
-            quotes = token_history[["timestamp", "price", "resolution_seconds"]].rename(
-                columns={"timestamp": "quote_time", "resolution_seconds": "quote_resolution_seconds"})
-            quotes = quotes.loc[quotes["quote_time"] >= opened].drop_duplicates("quote_time", keep="last")
-            frame = pd.merge_asof(frame, quotes, left_on="cutoff", right_on="quote_time", direction="backward")
+            quotes = token_history[["timestamp", "quote_available_at", "price", "resolution_seconds", "source"]].rename(
+                columns={"timestamp": "quote_time", "resolution_seconds": "quote_resolution_seconds",
+                         "source": "quote_source"})
+            quotes = quotes.loc[quotes["quote_time"] >= opened].sort_values(
+                ["quote_available_at", "quote_time"], kind="stable")
+            # A delayed older bucket must never displace a newer observation.
+            # Keep only updates to the latest observation known at each arrival.
+            quotes = quotes.loc[quotes["quote_time"].eq(quotes["quote_time"].cummax())]
+            quotes = quotes.drop_duplicates("quote_available_at", keep="last")
+            frame = pd.merge_asof(frame, quotes, left_on="cutoff", right_on="quote_available_at", direction="backward")
         frame["quote_age_seconds"] = (frame["cutoff"] - frame["quote_time"]).dt.total_seconds()
         valid = frame["price"].between(0, 1) & frame["quote_time"].notna()
         if age is not None:
@@ -126,11 +141,12 @@ def align_prices(markets: pd.DataFrame, prices: pd.DataFrame, calendar: pd.Datet
     if not frames:
         empty = metadata.iloc[:0].copy()
         empty["datetime"] = pd.Series(dtype="datetime64[ns]")
-        for column in ("cutoff", "quote_time"):
+        for column in ("cutoff", "quote_time", "quote_available_at"):
             empty[column] = pd.Series(dtype="datetime64[ns, UTC]")
         for column in ("price", "probability", "quote_age_seconds", "quote_resolution_seconds"):
             empty[column] = pd.Series(dtype=float)
         empty["quote_valid"] = pd.Series(dtype=bool)
+        empty["quote_source"] = pd.Series(dtype="string")
         return empty
     return pd.concat(frames, ignore_index=True).sort_values(["datetime", "market_id"]).reset_index(drop=True)
 
@@ -329,15 +345,22 @@ def prepare(config: dict, refresh: bool = False) -> Path:
         ) and len(manifest.get("files", {})) == 2:
             LOG.info("Reuse Polymarket factor panel %s", panel_dir)
             return panel_dir
-    histories = []
-    for record, path in zip(records, files):
-        history = pd.read_csv(path)
-        history["token_id"] = str(record["token_id"])
-        histories.append(history)
-    prices = pd.concat(histories, ignore_index=True) if histories else pd.DataFrame()
     # Include earlier calendar days for valid D1/D5 at the research boundary.
     alignment_days = days[days <= end]
-    aligned = align_prices(markets, prices, alignment_days, config.get("max_quote_age"))
+    # Raw quotes can contain tens of millions of rows. Align one token at a time
+    # and retain only its daily cutoffs, keeping memory bounded by one history.
+    aligned_parts = []
+    for index, (record, path) in enumerate(zip(records, files)):
+        history = pd.read_csv(path, usecols=lambda column: column in {
+            "timestamp", "price", "resolution_seconds", "source"})
+        history["token_id"] = str(record["token_id"])
+        aligned_parts.append(align_prices(
+            markets.iloc[[index]], history, alignment_days, config.get("max_quote_age")))
+        if (index + 1) % 100 == 0 or index + 1 == len(records):
+            LOG.info("Aligned %s/%s markets", index + 1, len(records))
+    aligned = (pd.concat(aligned_parts, ignore_index=True).sort_values(["datetime", "market_id"])
+               .reset_index(drop=True) if aligned_parts else
+               align_prices(markets, pd.DataFrame(), alignment_days, config.get("max_quote_age")))
     factors = compute_factors(aligned, alignment_days, config.get("negative_mass_tolerance", 1e-8))
     aligned = aligned.loc[aligned["datetime"] >= start].reset_index(drop=True)
     factors = factors.loc[factors["datetime"] >= start].reset_index(drop=True)

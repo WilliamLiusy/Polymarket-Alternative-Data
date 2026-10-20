@@ -79,6 +79,67 @@ def test_latest_invalid_quote_is_not_replaced_and_age_is_audited():
     assert result.loc[1, "price"] == .4
 
 
+@pytest.mark.parametrize("resolution", [60, 300, 1800, 10800])
+def test_data_v2_buckets_become_available_only_when_complete(resolution):
+    days = pd.DatetimeIndex(["2026-01-05"])
+    cutoff = pd.Timestamp("2026-01-05T07:00:00Z")
+    ids = ["before", "boundary", "pending", "exact", "clob", "local"]
+    rows = []
+    for name, offset in (("before", -1), ("boundary", 0), ("pending", 1)):
+        rows.append({"token_id": f"yes-{name}", "price": .6, "source": "data_v2",
+                     "timestamp": cutoff - pd.Timedelta(seconds=resolution) + pd.Timedelta(seconds=offset),
+                     "resolution_seconds": resolution})
+    # An unfinished new bucket cannot hide an older available observation.
+    rows.append({"token_id": "yes-pending", "price": .2, "source": "clob",
+                 "timestamp": cutoff - pd.Timedelta(hours=4), "resolution_seconds": 60})
+    for name, source in (("exact", "data_v2"), ("clob", "clob"), ("local", None)):
+        rows.append({"token_id": f"yes-{name}", "price": .4, "source": source,
+                     "timestamp": cutoff, "resolution_seconds": 0 if name == "exact" else resolution})
+    result = align_prices(pd.DataFrame([market(name) for name in ids]), pd.DataFrame(rows), days)
+    result = result.set_index("market_id")
+    assert result.loc[["before", "boundary"], "probability"].eq(.6).all()
+    assert result.loc["before", "quote_available_at"] == cutoff - pd.Timedelta(seconds=1)
+    assert result.loc["boundary", "quote_available_at"] == cutoff
+    assert result.loc["pending", "probability"] == .2
+    assert result.loc["pending", "quote_source"] == "clob"
+    assert result.loc[["exact", "clob", "local"], "probability"].eq(.4).all()
+    assert result.loc[["exact", "clob", "local"], "quote_available_at"].eq(cutoff).all()
+    assert (result["quote_available_at"] <= result["cutoff"]).all()
+
+
+def test_delayed_older_bucket_never_replaces_newer_observation():
+    days = pd.bdate_range("2026-01-05", periods=2)
+    prices = pd.DataFrame([
+        {"token_id": "yes-m1", "timestamp": "2026-01-05T06:00:00Z", "price": .9,
+         "resolution_seconds": 10800, "source": "data_v2"},
+        {"token_id": "yes-m1", "timestamp": "2026-01-05T06:59:00Z", "price": .4,
+         "resolution_seconds": 60, "source": "clob"},
+    ])
+    result = align_prices(pd.DataFrame([market()]), prices, days)
+    # The coarse point arrives at 09:00, after the first cutoff, but its older
+    # observation timestamp also prevents it from replacing CLOB the next day.
+    assert result["probability"].eq(.4).all()
+    assert result["quote_source"].eq("clob").all()
+    assert result["quote_time"].eq(pd.Timestamp("2026-01-05T06:59:00Z")).all()
+
+
+def test_data_v2_availability_precedes_price_validation_without_backfill():
+    days = pd.DatetimeIndex(["2026-01-05"])
+    prices = pd.DataFrame([
+        {"token_id": "yes-m1", "timestamp": "2026-01-05T06:58:00Z", "price": .2,
+         "resolution_seconds": 60, "source": "clob"},
+        {"token_id": "yes-m1", "timestamp": "2026-01-05T06:59:00Z", "price": 1.2,
+         "resolution_seconds": 60, "source": "data_v2"},
+        {"token_id": "yes-m1", "timestamp": "2026-01-05T07:00:00Z", "price": .7,
+         "resolution_seconds": 60, "source": "data_v2"},
+    ])
+    result = align_prices(pd.DataFrame([market()]), prices, days)
+    assert result.loc[0, "price"] == 1.2
+    assert result.loc[0, "quote_available_at"] == pd.Timestamp("2026-01-05T07:00:00Z")
+    assert not result.loc[0, "quote_valid"]
+    assert np.isnan(result.loc[0, "probability"])
+
+
 def test_threshold_scale_uses_available_metadata_and_does_not_skip_missing_quote():
     days = pd.bdate_range("2026-01-05", periods=2)
     markets = [market("a", threshold=60), market("b", threshold=80), market("c", threshold=100),
@@ -294,6 +355,93 @@ def test_prepare_reads_layout_preserves_warmup_and_invalidates_changed_inputs(tm
     assert "historical contract metadata versions" in manifest["metadata_vintage_limitation"]
 
 
+@pytest.mark.parametrize("include_resolution", [False, True])
+def test_prepare_per_market_alignment_matches_joint_history_and_global_groups(
+        tmp_path, monkeypatch, include_resolution):
+    import polymarket_ext.factors as factor_module
+
+    days = pd.bdate_range("2026-01-05", periods=7)
+    markets = [market("threshold_low", threshold=60),
+               market("threshold_middle", threshold=80),
+               market("threshold_high", threshold=100),
+               market("range_left", "range", lower=-np.inf, upper=60),
+               market("range_middle", "range", lower=60, upper=100),
+               market("range_right", "range", lower=100, upper=np.inf),
+               market("unquoted", "record", record_threshold=147.27)]
+    probabilities = [[.9] * 7, [.6] * 7, [.2] * 7,
+                     [.1, .2, .3, .4, .5, .6, .7],
+                     [.8, .7, .6, .5, .4, .3, .2], [.1] * 7, []]
+    histories = []
+    for index, (item, values) in enumerate(zip(markets, probabilities)):
+        history = quotes([item], days, [values]).reindex(columns=["token_id", "timestamp", "price"])
+        if item["market_id"] == "threshold_middle":
+            history = history.drop(index=5)
+        if item["market_id"] == "range_middle":
+            history = history.drop(index=2)
+        # Mix modern and legacy CSVs in the same preparation run, and check
+        # separately that an entirely legacy collection is still accepted.
+        if include_resolution and index % 2 == 0:
+            history["resolution_seconds"] = 60
+            history["source"] = "data_v2"
+            history["timestamp"] -= 60
+        history["unused_api_payload"] = "not a factor input"
+        directory = tmp_path / "data" / item["market_dir"]
+        directory.mkdir(parents=True)
+        history.drop(columns="token_id").to_csv(directory / "yes_prices.csv", index=False)
+        histories.append(history)
+    (tmp_path / "data/markets.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in markets))
+    calendar_file = tmp_path / "calendar.txt"
+    calendar_file.write_text("\n".join(days.strftime("%Y-%m-%d")))
+    config = {"data_dir": str(tmp_path / "data"), "panel_dir": str(tmp_path / "panel"),
+              "calendar_path": str(calendar_file), "max_quote_age": "1h",
+              "research_start": str(days[5].date()), "research_end": str(days[6].date())}
+
+    # The public functions provide the original all-histories-at-once oracle.
+    expected_aligned = align_prices(pd.DataFrame(markets), pd.concat(histories, ignore_index=True),
+                                    days, max_quote_age="1h")
+    expected_factors = compute_factors(expected_aligned, days)
+    calls = []
+
+    def align_one_market(metadata, history, calendar, max_quote_age=None):
+        assert len(metadata) == 1
+        assert set(history.columns) <= {"timestamp", "price", "resolution_seconds", "source", "token_id"}
+        assert set(history["token_id"]) <= {metadata.iloc[0]["token_id"]}
+        calls.append(metadata.iloc[0]["market_id"])
+        return align_prices(metadata, history, calendar, max_quote_age)
+
+    monkeypatch.setattr(factor_module, "align_prices", align_one_market)
+    destination = prepare(config)
+    for name, expected in (("aligned", expected_aligned), ("factors", expected_factors)):
+        expected = expected.loc[expected["datetime"] >= days[5]].reset_index(drop=True)
+        pd.testing.assert_frame_equal(pd.read_parquet(destination / f"{name}.parquet"),
+                                      expected, check_dtype=False)
+    assert calls == [item["market_id"] for item in markets]
+
+    result = pd.read_parquet(destination / "factors.parquet").set_index(["datetime", "market_id"])
+    first, last = result.loc[days[5]], result.loc[days[6]]
+    # Missing quotes retain their market and its boundary; adjacency never skips it.
+    assert np.isnan(first.loc["threshold_middle", "PROB"])
+    assert np.isnan(first.loc["threshold_low", "THRESHOLD_ADJACENT_MASS"])
+    assert first.loc["threshold_middle", "THRESHOLD_REL_POSITION"] == 0
+    assert last.loc["threshold_low", "THRESHOLD_ADJACENT_MASS"] == pytest.approx(.3)
+    assert last.loc["threshold_low", "THRESHOLD_REL_DENSITY"] == pytest.approx(1.2)
+    range_rows = first.loc[["range_left", "range_middle", "range_right"]]
+    assert range_rows["group_center"].eq(80).all()
+    assert range_rows["RANGE_REL_WIDTH"].sum() == pytest.approx(1)
+    assert first.loc["range_left", "D5"] == pytest.approx(.5)
+    assert last.loc["range_left", "D1"] == pytest.approx(.1)
+    assert first.loc["range_middle", "D1"] == pytest.approx(-.1)
+    assert result.xs("range_middle", level="market_id")["D5"].isna().all()
+    assert result.xs("unquoted", level="market_id")[list(CATEGORY_FACTORS["record"])].isna().all().all()
+    if include_resolution:
+        assert first.loc["threshold_low", "quote_resolution_seconds"] == 60
+        assert first.loc["threshold_low", "quote_source"] == "data_v2"
+        assert first.loc["threshold_low", "quote_available_at"] == first.loc["threshold_low", "cutoff"]
+    else:
+        assert result["quote_resolution_seconds"].isna().all()
+
+
 def test_prepare_direction_times_cross_research_end_and_reject_legacy_catalog(tmp_path):
     days = pd.DatetimeIndex(["2026-09-28", "2026-09-29", "2026-09-30"])
     item = market("direction", "direction", observation_start="2026-09-01T00:00:00Z",
@@ -313,7 +461,7 @@ def test_prepare_direction_times_cross_research_end_and_reject_legacy_catalog(tm
     assert result["PROB"].isna().all()
     np.testing.assert_allclose(result["WINDOW_LENGTH"], np.log1p(30))
     np.testing.assert_allclose(result["TIME_TO_END"], np.log1p(np.array([41, 17]) / 24))
-    assert json.loads((path / "manifest.json").read_text())["version"] == 2
+    assert json.loads((path / "manifest.json").read_text())["version"] == 3
     # A previously created panel cannot bypass reclassification of old timestamps.
     item.pop("time_extraction_version")
     catalog.write_text(json.dumps(item) + "\n")

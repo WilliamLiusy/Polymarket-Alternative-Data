@@ -184,7 +184,7 @@ def test_discover_source_change_resumes_without_reusing_old_open_pages(monkeypat
         assert manifest["source_identity"] == result["source_identity"]
 
 
-def test_price_retention_fallback_keeps_old_data_and_excludes_settlement(tmp_path):
+def test_price_retention_fallback_keeps_old_data_and_exact_terminal_ticks(tmp_path):
     queried = []
     class Client:
         def clob_prices(self, token, start, end):
@@ -202,15 +202,72 @@ def test_price_retention_fallback_keeps_old_data_and_excludes_settlement(tmp_pat
     result = collect._download_prices(Client(), "1", tmp_path, "yes", 0, 300, SETTINGS, False)
     frame = pd.read_csv(tmp_path / "yes_prices.csv")
     assert queried == [60, 300]
-    assert frame["timestamp"].tolist() == [0, 240]
-    assert frame["price"].tolist() == [0.4, 0.6]
-    assert frame["resolution_seconds"].tolist() == [300, 60]
+    assert frame["timestamp"].tolist() == [0, 240, 299]
+    assert frame["price"].tolist() == [0.4, 0.6, 1.0]
+    assert frame["resolution_seconds"].tolist() == [300, 60, 0]
     assert result["api_complete"]
-    assert result["resolution_seconds"] == [60, 300]
+    assert result["resolution_seconds"] == [0, 60, 300]
     assert result["max_gap_seconds"] == 240
-    # Raw settlement evidence is retained, but never enters prediction quotes.
+    # Official exact ticks remain available both as raw evidence and normalized quotes.
     raw = collect._load(tmp_path / "raw" / "yes" / "0-300" / "data_300" / "000000.json")
     assert raw["data"][-1]["resolution_seconds"] == 0
+
+
+@pytest.mark.parametrize("resolution", [-1, -0.5])
+def test_price_rows_reject_negative_resolution(resolution):
+    with pytest.raises(ValueError, match="resolution_seconds cannot be negative"):
+        collect._price_rows([{"timestamp": 10, "price": 0.5,
+                              "resolution_seconds": resolution}], "data_v2", 60, 0, 20)
+
+
+def test_exact_ticks_obey_requested_window_and_win_duplicate_buckets(tmp_path):
+    class Client:
+        def clob_prices(self, token, start, end):
+            return {"history": [{"t": 60, "p": 0.6}]}
+        def prices(self, token, start, end, grain, cursor):
+            return {"data": [{"timestamp": 60, "price": 0.7, "resolution_seconds": 0},
+                             {"timestamp": 0, "price": 0.1, "resolution_seconds": 0},
+                             {"timestamp": 120, "price": 1.0, "resolution_seconds": 0}]}, None
+    result = collect._download_prices(Client(), "1", tmp_path, "yes", 0, 120, SETTINGS, False)
+    frame = pd.read_csv(tmp_path / "yes_prices.csv")
+    assert frame["timestamp"].tolist() == [0, 60]
+    assert frame["price"].tolist() == [0.1, 0.7]
+    assert frame["resolution_seconds"].tolist() == [0, 0]
+    assert result["rows"] == 2 and result["api_complete"]
+
+
+def test_old_price_schema_rebuilds_from_raw_instead_of_reusing_csv(monkeypatch, tmp_path):
+    markets = _write_markets(tmp_path, 1)
+    class Client:
+        def __init__(self, settings): pass
+        def clob_prices(self, token, start, end):
+            return {"history": [{"t": start, "p": 0.6}]}
+        def prices(self, *args): return {"data": []}, None
+        def trades(self, *args): return {"data": []}, None
+        def close(self): pass
+    monkeypatch.setattr(collect, "OfficialClient", Client)
+    config = {"data_dir": str(tmp_path), "collection": SETTINGS}
+    collect.download(config)
+    directory = tmp_path / markets[0]["market_dir"]
+    coverage = collect._load(directory / "coverage.json")
+    assert coverage.pop("normalized_price_schema_version") == collect.PRICE_SCHEMA_VERSION == 2
+    collect._save(directory / "coverage.json", coverage)
+    identity_before = collect._load(directory / "raw" / "source_identity.json")
+    csv_before = (directory / "yes_prices.csv").stat().st_mtime_ns
+    class OfflineClient:
+        def __init__(self, settings): pass
+        def clob_prices(self, *args): pytest.fail("must reuse existing CLOB raw pages")
+        def prices(self, *args): pytest.fail("must reuse existing Data v2 raw pages")
+        def trades(self, *args): pytest.fail("must reuse existing trade raw pages")
+        def close(self): pass
+    monkeypatch.setattr(collect, "OfficialClient", OfflineClient)
+    collect.download(config)
+    updated = collect._load(directory / "coverage.json")
+    assert updated["normalized_price_schema_version"] == 2
+    assert updated["api_complete"]
+    assert (directory / "yes_prices.csv").stat().st_mtime_ns != csv_before
+    assert collect._load(directory / "raw" / "source_identity.json") == identity_before
+    assert not (directory / "raw_archive").exists()
 
 
 def test_trade_pages_keep_identical_distinct_fills(tmp_path):

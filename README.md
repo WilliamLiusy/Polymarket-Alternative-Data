@@ -132,7 +132,7 @@ uv run python -m polymarket_ext train
 | Yes/Up 与 No/Down 历史价格 | CLOB `/prices-history` 请求 `fidelity=1`；官方 SDK 的 Data v2 `list_price_history` 补充不同粒度 | 逐时间窗口请求最细数据；记录每条数据的实际粒度，不从 Yes 推算 No |
 | 逐笔交易 | Data `/v2/trades`，官方 `PublicClient.list_trades`，cursor 分页 | 按市场查询为最近三年的滚动窗口；最小数量 0.01 token；保存逐笔原始价格、数量、方向和时间 |
 
-Data v2 文档给出的最低保存期限为：1 分钟 7 天、5 分钟 60 天、30 分钟 90 天；3 小时历史可追溯至 2022-11-18。程序也请求 CLOB 的一分钟历史，保留它仍能提供的较细报价，再按实际响应补充较粗数据；不会把请求一分钟等同于获得连续一分钟历史。Data v2 `resolution_seconds=0` 可能是合成结算点，仅留在原始响应，不用于历史因子。交易使用 taker 视角避免把一笔撮合按双方重复计算，也不基于相同时间和价格误删独立成交。
+Data v2 文档给出的最低保存期限为：1 分钟 7 天、5 分钟 60 天、30 分钟 90 天；3 小时历史可追溯至 2022-11-18。程序也请求 CLOB 的一分钟历史，保留它仍能提供的较细报价，再按实际响应补充较粗数据；不会把请求一分钟等同于获得连续一分钟历史。[Data v2 官方 OpenAPI](https://data-api.polymarket.com/v2/openapi.json) 将聚合点的 `timestamp` 定义为桶起点，价格观察发生在该桶内，因此只有 `timestamp + resolution_seconds` 不晚于截面时才可使用。`resolution_seconds=0` 表示精确 tick（包括返回窗口的末次真实观察），按原时间戳保留，不一概视作合成结算点。交易使用 taker 视角避免把一笔撮合按双方重复计算，也不基于相同时间和价格误删独立成交。
 
 官方资料：[统一 Python SDK](https://github.com/Polymarket/py-sdk)、[CLOB 历史价格](https://docs.polymarket.com/api-reference/markets/get-prices-history)、[Data v2 历史价格](https://docs.polymarket.com/api-reference/markets/get-a-tokens-price-history)、[Data v2 逐笔交易](https://docs.polymarket.com/api-reference/feeds/list-trades)、[Gamma 事件分页](https://docs.polymarket.com/api-reference/events/list-events-keyset-pagination)。CLOB 历史接口尚无统一 SDK 的专门方法，因此通过该 SDK 的 HTTP transport 调用；与固定 SDK 版本相关的适配集中在 `collect.OfficialClient`。
 
@@ -192,6 +192,8 @@ Gamma 当前快照不提供完整的历史规则修订版本。程序保留 `cre
 
 全部公式遵循 AGENTS.md。每个真实 A 股交易日以北京时间 15:00 为截面，只使用不晚于该时刻的报价；市场必须已开放且元数据可用，观察结束、到期或关闭后不再有效。默认超过 24 小时的报价视为缺失，可通过 `max_quote_age` 调整或设为 `null`。保留报价时间、年龄、原始价格、实际分辨率和有效性，不做向后填充或未来插值。
 
+Data v2 聚合点等待其采样桶结束后才进入候选集；精确 tick 与 CLOB 点按返回的观察时间处理。在当时已可用的候选中选观察时间最新者，旧粗桶晚到不会覆盖较新的已知报价。面板额外保留 `quote_available_at` 和 `quote_source` 供核验。因子面板版本已升级为 3；旧版本需重建并重新训练。
+
 区间涨跌类保留 `PROB`、`ENTROPY`、`DIRECTION_SCORE`、`DIRECTION_CERTAINTY`，并增加两个无量纲时间因子。设规则用于比较涨跌的起止价格时刻为 $T_s$、$T_e$，当前 A 股收盘截面为 $t$：
 
 | 因子 | 计算式 |
@@ -205,6 +207,8 @@ Gamma 当前快照不提供完整的历史规则修订版本。程序保留 `cre
 
 D1/D5 按完整 A 股交易日历在同一 token 内计算；D5 必须连续六个有效截面。开放尾部用反正切有界坐标计算宽度和密度，缺报价、非法边界或无效尺度保留 NaN。输出为市场级长表，保留每个市场的全部指定因子及分组中心、尺度。
 
+`prepare` 逐 market 读取历史报价并对齐收盘截面，只在内存中汇总市场日表，随后统一计算跨 market 的分组因子。报价历史再多也不需要同时载入全部 token；分组中心、相邻门槛和 D1/D5 的计算口径保持一致。
+
 ### 股票敏感度模型与验证
 
 扩展模型是 Qlib `Model` 子类，使用 `DatasetH`、`DataHandlerLP` 和 Qlib IC 接口。每只训练股票有五个可训练的 `b_i`，初始值为 1，允许负值。因子仅使用训练段的有限数值估计标准化参数，标准化后将缺失数值槽填为 0；编码器接收 `[标准化因子 × b_i, 逐因子 missing]`，其中 `missing=1` 表示 NaN 或正负无穷，`missing=0` 表示真实数值（包括真实的 0）。缺失标记不乘 `b_i`，不另设可训练的缺失向量。
@@ -212,6 +216,8 @@ D1/D5 按完整 A 股交易日历在同一 token 内计算；D5 必须连续六�
 当天各类活跃市场均保留，包括缺报价或全部因子缺失的真实市场行。无报价时仍可计算的位置、区间宽度等因子参与模型；其余因子逐项标为缺失。编码后的市场向量按类别取均值，附 `log(1 + 市场数量)` 和类别缺失标记，再与 Alpha158 拼接预测收益。类别缺失标记仅在该类全部真实市场均无有限因子时为 1，无市场时也为 1；至少一个因子有效则为 0。没有市场时均值向量和数量均为 0；用于凑齐批次长度的填充行不参与均值、数量或有效性判断。每个市场都在聚合前输入编码器，市场数量可以变化，新 market 不需要新增模型列。新股票的 `b_i` 使用中性值 1。
 
 五个 `b_i` 与 MLP 预测网络联合反向传播训练并保存到 `sensitivities.csv`。Baseline 与扩展共享 MLP 预测头、训练流程和 Alpha158 归一化；扩展的输入增加五类市场编码、数量及类别缺失标记。参数是模型内部的相对敏感度，其尺度也受编码器影响，不宜当成已识别的经济因果暴露。
+
+编码器只计算批次中的真实 market 行，再按股票样本聚合，避免为长期没有 Polymarket 数据的历史样本重复编码填充行。真实但因子全缺失的 market 仍参与编码；整批无市场时保留编码器参数的零梯度，使 Adam 动量和权重衰减与完整填充计算一致。
 
 日度与多日涨跌共同使用 `direction` 的六个因子、一个类别编码器和每只股票的同一个 `b_i`。默认该编码器为 `12 → 32 → 32`，其他四类保持原结构；类别总数仍为五，最终 MLP 输入仍为 `158 + 5 × (32 + 2) = 328` 维。两个时间因子遵循相同的训练段标准化、敏感度缩放和逐因子缺失标记规则。
 

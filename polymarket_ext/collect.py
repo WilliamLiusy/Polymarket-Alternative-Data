@@ -21,13 +21,16 @@ import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 PRICE_COLUMNS = ["timestamp", "price", "resolution_seconds", "source"]
+PRICE_SCHEMA_VERSION = 2
 PRICE_NOTE = (
     "CLOB is requested at fidelity=1 minute. Data v2 explicitly probes 60, 300, "
     "1800 and 10800 second grains. Fine history expires; the documented minimum "
     "retention is 7/60/90 days for 1/5/30 minute data, with 3-hour history "
     "permanent from 2022-11-18. Actual returned coverage is recorded; empty "
-    "responses are not evidence that a market never traded. Data v2 resolution=0 "
-    "points may be synthetic settlement prices and are retained only in raw pages."
+    "responses are not evidence that a market never traded. Data v2 "
+    "resolution_seconds=0 denotes exact tick observations, including terminal "
+    "ticks, and these remain in normalized histories. Positive resolutions "
+    "denote bucket widths."
 )
 TRADE_NOTE = (
     "Public Data API v2 condition feeds expose a rolling three-year window, "
@@ -287,10 +290,13 @@ def _price_rows(payload: list[dict], source: str, grain: int, start: int, end: i
     for point in payload:
         stamp = _timestamp(point.get("timestamp", point.get("t")))
         price = float(point.get("price", point.get("p")))
-        resolution = int(point.get("resolution_seconds", grain))
+        raw_resolution = point.get("resolution_seconds", grain)
+        resolution = int(raw_resolution)
         if stamp is None or not math.isfinite(price) or not 0 <= price <= 1:
             raise ValueError("Invalid token price returned by official API")
-        if resolution > 0 and start <= stamp < end:
+        if float(raw_resolution) < 0:
+            raise ValueError("Token price resolution_seconds cannot be negative")
+        if start <= stamp < end:
             rows.append({"timestamp": stamp, "price": price,
                          "resolution_seconds": resolution, "source": source})
     return rows
@@ -434,7 +440,8 @@ def _download_market(market: dict, data_dir: Path, settings: dict, now: int,
     raw_identity = _load(raw_identity_path)
     raw_identity_changed = raw_identity != identity if raw_identity else identity_changed
     artifacts = _artifacts(directory)
-    if previous.get("api_complete") and not refresh and not identity_changed and not raw_identity_changed \
+    if previous.get("api_complete") and previous.get("normalized_price_schema_version") == PRICE_SCHEMA_VERSION \
+            and not refresh and not identity_changed and not raw_identity_changed \
             and len(artifacts) == 3 and previous.get("artifacts") == artifacts:
         return previous
     # Switch every raw stream before advertising the new identity in coverage.
@@ -449,7 +456,8 @@ def _download_market(market: dict, data_dir: Path, settings: dict, now: int,
     market_refresh = refresh
     start, end = _history_bounds(market, now)
     coverage = {"market_id": market["market_id"], "api_complete": False,
-                "source_identity": identity, "collected_at": datetime.now(UTC).isoformat()}
+                "source_identity": identity, "collected_at": datetime.now(UTC).isoformat(),
+                "normalized_price_schema_version": PRICE_SCHEMA_VERSION}
     _save(coverage_path, coverage)
     try:
         if start >= end:
