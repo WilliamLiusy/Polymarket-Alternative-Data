@@ -6,12 +6,39 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 
 import numpy as np
 import pandas as pd
 
 
 GROUPS = [f"Q{i}" for i in range(1, 6)]
+
+
+def resolve_paths(
+    predictions: Path | None = None,
+    output_dir: Path | None = None,
+    *,
+    output_root: Path = Path("outputs/baseline"),
+) -> tuple[Path, Path]:
+    """Select the latest completed baseline run and keep its analysis together."""
+    if predictions is None:
+        completed = [
+            path for path in output_root.iterdir()
+            if path.is_dir() and re.fullmatch(r"\d{8}T\d{12}", path.name)
+            and (path / "summary.json").is_file()
+            and (path / "predictions.parquet").is_file()
+        ] if output_root.is_dir() else []
+        if completed:
+            predictions = max(completed, key=lambda path: path.name) / "predictions.parquet"
+        elif (output_root / "predictions.parquet").is_file():
+            predictions = output_root / "predictions.parquet"
+        else:
+            raise FileNotFoundError(
+                f"No completed baseline run with summary.json and predictions.parquet under {output_root}; "
+                "pass --predictions explicitly"
+            )
+    return predictions, output_dir if output_dir is not None else predictions.parent / "quintiles"
 
 
 def analyze(predictions: pd.DataFrame):
@@ -103,9 +130,10 @@ def plot_quintiles(values: pd.DataFrame, output: Path, *, cumulative: bool = Fal
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--predictions", type=Path, default=Path("outputs/baseline/predictions.parquet"))
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/baseline/quintiles"))
+    parser.add_argument("--predictions", type=Path, help="默认使用最新已完成 baseline 运行的预测")
+    parser.add_argument("--output-dir", type=Path, help="默认保存至预测文件所在目录的 quintiles/ 子目录")
     args = parser.parse_args()
+    args.predictions, args.output_dir = resolve_paths(args.predictions, args.output_dir)
     predictions = pd.read_parquet(args.predictions)
     members, means, counts, sizes, summary = analyze(predictions)
     args.output_dir.mkdir(parents=True, exist_ok=True)

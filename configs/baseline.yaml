@@ -16,7 +16,7 @@ download:
 qlib:
   kernels: 1
 model:
-  epochs: 10  # 手动设置；每月用全部已知标签历史从头训练这些轮数
+  epochs: 20  # 手动设置；每月用全部已知标签历史从头训练这些轮数
   batch_size: 512
   hidden_size: 32
   learning_rate: 0.001

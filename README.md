@@ -11,7 +11,7 @@
 - 标准化：在每个 T 日有效成员标签中使用普通 zscore，样本标准差 `ddof=1`；无效标签不进入训练，零方差截面不计分。
 - 指标：逐日计算预测与标准化真实收益的 Pearson IC，按有效交易日等权汇总；同时提供 Rank IC。收益标签的 zscore 不改变 Pearson 相关系数。
 
-项目覆盖2008-01-01至2026-09-30，默认测试2026年4月至9月。每月使用从2008年起、测试月开始前所有标签已知的历史样本，重新估计特征归一化参数、初始化模型和优化器，从头训练一次。训练轮数由 `model.epochs` 手动指定，默认10轮。Baseline 和 Polymarket 扩展统一使用这一口径，不划分验证集，不使用早停或自动选 epoch。
+项目覆盖2008-01-01至2026-09-30，默认测试2026年4月至9月。每月使用从2008年起、测试月开始前所有标签已知的历史样本，重新估计特征归一化参数、初始化模型和优化器，从头训练一次。训练轮数由 `model.epochs` 手动指定，当前 baseline 配置为20轮；省略该参数时回退为10轮。Baseline 和 Polymarket 扩展统一使用这一训练口径，不划分验证集，不使用早停或自动选 epoch。
 
 | 测试区间 | 训练标签可用截止日 |
 | --- | --- |
@@ -42,7 +42,7 @@ uv run python -m baseline train
 uv run pytest -q
 ```
 
-配置集中在 `configs/baseline.yaml`，相对路径以当前工作目录为基准。`train_start` 设置固定的训练起点，`first_test_month` 设置首个测试月，之后按月扩展训练历史。`download_end: null` 表示下载截至运行日期的可用行情；研究与评价边界仍固定为 `research_end`。`--refresh` 强制重建所选阶段产物。普通重跑复用完整且匹配的缓存；网络下载中断后可以继续运行同一命令。下载失败会记录问题并终止，避免把缺失股票静默当作有效样本池。
+配置集中在 `configs/baseline.yaml`，相对路径以当前工作目录为基准。`train_start` 设置固定的训练起点，`first_test_month` 设置首个测试月，之后按月扩展训练历史。`download_end: null` 表示下载截至运行日期的可用行情；研究与评价边界仍固定为 `research_end`。`--refresh` 强制重建所选阶段产物。下载和特征准备复用完整且匹配的缓存；每次 CLI 训练新建独立运行目录并重新训练。网络下载中断后可以继续运行同一命令。下载失败会记录问题并终止，避免把缺失股票静默当作有效样本池。
 
 若 BaoStock 返回 `10001011`（黑名单用户），下载会保留检查点并立即停止后续请求，不再重试或重新登录；待服务恢复访问后，运行同一命令即可续传。
 
@@ -58,7 +58,12 @@ akshare/hs300/
   metadata.json               # 下载区间、成员来源更新日期
 data/qlib/hs300/               # Qlib 日历、成员有效区间及二进制行情
 data/alpha158/                 # 按年缓存特征、标准化标签及原始标签
-outputs/baseline/              # 月度模型、预测、IC 和实验记录
+outputs/baseline/
+  YYYYMMDDTHHMMSSffffff/        # 每次 CLI train / all 运行的北京时间戳
+    training_config.yaml       # 本次运行的完整配置快照
+    training_config.json
+    YYYY-MM/                  # 月度模型、预测、IC 和实验记录
+    predictions.parquet / daily_ic.csv / monthly_ic.csv / summary.json
 ```
 
 行情CSV保留日期、股票代码、开高低收、成交量、成交额、振幅、涨跌幅、涨跌额、换手率，另加未复权 `raw_close`。原始成交量单位为手、成交额单位为元。转换到 Qlib 时，令 `factor=后复权收盘价/raw_close`，成交量为 `原始成交量×100/factor`，VWAP为 `成交额/(原始成交量×100)×factor`，与后复权价格保持一致。
@@ -73,7 +78,11 @@ Qlib provider 保留研究起点前的行情，但在研究结束日截断，阻
 
 年度缓存采用每个真实交易日完整历史成员的 `(datetime, instrument)` 索引，分别保存158维特征、标准化标签及原始标签。成员日超过该股最后一条行情时，仍保留全 `NaN` 行，不填充行情；未知标签样本不参与训练，测试预测仍保留。缓存指纹包含 `membership-index-v1`，manifest 记录 `index_policy` 与 `index_version`，旧索引缓存需重新生成。每月装载从 `train_start` 到当轮训练截止日的完整历史，以及当月测试数据，使用 `DataHandlerLP.from_df` 和 `DatasetH` 组织数据；复用年度特征，不重复计算 Alpha158。
 
-输出目录下 `YYYY-MM/` 保存 `model.pkl`（含归一化参数的完整 Qlib 模型）、`model.pt`（网络权重）、`training_history.csv`、`predictions.parquet`、`daily_ic.csv`、`metrics.json`、`run.json` 和完整配置；`completed.json` 用于校验续跑产物。`run.json` 的 `window`、`segments`、`actual`、`model` 描述训练范围和参数，`trained_epochs` 记录实际训练轮数，训练方案为 `expanding_monthly_fixed_epochs`。不生成验证指标或选轮数阶段产物。顶层 `predictions.parquet`、`daily_ic.csv`、`monthly_ic.csv`、`summary.json` 汇总六轮结果。预测列为 `score`、`label`（zscore标签）、`raw_label`（原始收益）。Qlib实验记录保存在本地 `mlflow.db`，对应文件位于 `artifacts/`。
+Baseline 的 `output_dir` 是运行结果的父目录。CLI 执行 `train` 或 `all` 时，新建精确到微秒的北京时间目录，并在开始运行阶段前保存解析后的 `training_config.yaml` 和 `training_config.json`，包含绝对数据路径、本次输出路径、研究区间及模型参数。直接调用 `baseline.train.train(config)` 时仍使用传入的具体目录，可续跑该目录中的已完成月份。
+
+`uv run python -m baseline.quintiles` 默认读取最近一次已完成运行的预测，将五分组分析保存到该运行的 `quintiles/` 子目录；也可用 `--predictions` 和 `--output-dir` 指定路径。
+
+每次运行目录下 `YYYY-MM/` 保存 `model.pkl`（含归一化参数的完整 Qlib 模型）、`model.pt`（网络权重）、`training_history.csv`、`predictions.parquet`、`daily_ic.csv`、`metrics.json`、`run.json` 和完整配置；`completed.json` 用于校验续跑产物。`run.json` 的 `window`、`segments`、`actual`、`model` 描述训练范围和参数，`trained_epochs` 记录实际训练轮数，训练方案为 `expanding_monthly_fixed_epochs`。不生成验证指标或选轮数阶段产物。运行目录顶层 `predictions.parquet`、`daily_ic.csv`、`monthly_ic.csv`、`summary.json` 汇总六轮结果。预测列为 `score`、`label`（zscore标签）、`raw_label`（原始收益）。Qlib实验记录保存在本次运行的 `mlflow.db`，对应文件位于 `artifacts/`。
 
 固定轮数训练的模型指纹已升级，旧模型需要重训。研究结束日由9月18日延长至9月30日后，先补齐原始行情和历史成分，再重新生成覆盖新区间的 provider 和 Alpha158 缓存：
 

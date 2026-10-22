@@ -1,4 +1,8 @@
+from copy import deepcopy
+from datetime import datetime, timezone
+import json
 from pathlib import Path
+import sys
 
 import pytest
 import yaml
@@ -14,7 +18,7 @@ def test_default_config_uses_requested_protocol():
     assert not {"common_start", "common_end", "lookback_months"}.intersection(config)
     assert "validation_months" not in config
     assert "early_stopping_rounds" not in config["model"]
-    assert config["model"]["epochs"] == 10
+    assert config["model"]["epochs"] == 20
     assert config["model"]["hidden_size"] == 32
     assert "num_boost_round" not in config["model"]
     assert Path(config["data_dir"]).is_absolute()
@@ -72,6 +76,80 @@ def test_omitted_epochs_defaults_to_ten(tmp_path):
     path = tmp_path / "config.yaml"
     path.write_text(yaml.safe_dump(config))
     assert load_config(path)["model"]["epochs"] == 10
+
+
+def test_timestamped_output_dir_uses_beijing_time(tmp_path):
+    from baseline.__main__ import timestamped_output_dir
+
+    now = datetime(2026, 10, 22, 18, 2, 3, 456789, tzinfo=timezone.utc)
+    assert timestamped_output_dir(tmp_path, now=now) == tmp_path / "20261023T020203456789"
+
+
+@pytest.mark.parametrize("command", ["train", "all"])
+def test_training_cli_creates_timestamped_run_and_saves_effective_config(tmp_path, monkeypatch, command):
+    import baseline.__main__ as cli
+    import baseline.download as download_module
+    import baseline.prepare as prepare_module
+    import baseline.train as train_module
+
+    config = yaml.safe_load(Path("configs/baseline.yaml").read_text())
+    output_root = tmp_path / "outputs"
+    config["output_dir"] = str(output_root)
+    config_path = tmp_path / "baseline.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    expected = load_config(config_path)
+    run_dir = output_root / "20261022T180203456789"
+    monkeypatch.setattr(cli, "timestamped_output_dir", lambda root: Path(root) / run_dir.name)
+    calls = []
+
+    def observe(stage):
+        def run(effective_config, refresh=False):
+            calls.append((stage, deepcopy(effective_config), refresh))
+            if stage == "train":
+                assert json.loads((run_dir / "training_config.json").read_text()) == effective_config
+                assert yaml.safe_load((run_dir / "training_config.yaml").read_text()) == effective_config
+            return {"stage": stage}
+
+        return run
+
+    monkeypatch.setattr(download_module, "download", observe("download"))
+    monkeypatch.setattr(prepare_module, "prepare", observe("prepare"))
+    monkeypatch.setattr(train_module, "train", observe("train"))
+    monkeypatch.setattr(sys, "argv", ["baseline", command, "--config", str(config_path)])
+    cli.main()
+
+    assert [stage for stage, _, _ in calls] == (["train"] if command == "train" else ["download", "prepare", "train"])
+    expected["output_dir"] = str(run_dir)
+    assert all(effective_config == expected and refresh is False for _, effective_config, refresh in calls)
+    assert list(output_root.iterdir()) == [run_dir]
+    assert json.loads((run_dir / "training_config.json").read_text()) == expected
+    assert yaml.safe_load((run_dir / "training_config.yaml").read_text()) == expected
+    assert load_config(config_path)["output_dir"] == str(output_root)
+
+
+@pytest.mark.parametrize("command", ["download", "prepare"])
+def test_nontraining_cli_does_not_create_run_directory(tmp_path, monkeypatch, command):
+    import baseline.__main__ as cli
+    import baseline.download as download_module
+    import baseline.prepare as prepare_module
+
+    config = yaml.safe_load(Path("configs/baseline.yaml").read_text())
+    output_root = tmp_path / "outputs"
+    config["output_dir"] = str(output_root)
+    config_path = tmp_path / "baseline.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    calls = []
+
+    def run(effective_config, refresh=False):
+        calls.append(deepcopy(effective_config))
+
+    module = download_module if command == "download" else prepare_module
+    monkeypatch.setattr(module, command, run)
+    monkeypatch.setattr(sys, "argv", ["baseline", command, "--config", str(config_path)])
+    cli.main()
+
+    assert calls == [load_config(config_path)]
+    assert not output_root.exists()
 
 
 @pytest.mark.parametrize("extra,parameter", [

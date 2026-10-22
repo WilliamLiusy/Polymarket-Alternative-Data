@@ -3,8 +3,9 @@
 import argparse
 import json
 import logging
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -52,6 +53,13 @@ def load_config(path):
     return config
 
 
+def timestamped_output_dir(output_dir, now=None):
+    """Return a per-run output directory using Beijing local time."""
+    now = now or datetime.now(ZoneInfo("Asia/Shanghai"))
+    run_id = now.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y%m%dT%H%M%S%f")
+    return Path(output_dir) / run_id
+
+
 def main():
     parser = argparse.ArgumentParser(description="历史沪深300 Qlib MLP 月度扩展窗口 baseline")
     parser.add_argument("command", choices=("download", "prepare", "train", "all"))
@@ -61,6 +69,17 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config = load_config(args.config)
     commands = ("download", "prepare", "train") if args.command == "all" else (args.command,)
+    if "train" in commands:
+        output_dir = timestamped_output_dir(config["output_dir"])
+        output_dir.mkdir(parents=True, exist_ok=False)
+        config["output_dir"] = str(output_dir)
+        (output_dir / "training_config.json").write_text(
+            json.dumps(config, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        )
+        (output_dir / "training_config.yaml").write_text(
+            yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8"
+        )
+        logging.info("本次训练输出目录：%s", output_dir)
     for command in commands:
         if command == "download":
             from .download import download as run
