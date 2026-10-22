@@ -1,0 +1,33 @@
+[82370:MainThread](2026-10-19 16:30:44,696) INFO - qlib.Initialization - [config.py:452] - default_conf: client.
+2026/10/19 16:30:45 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /home/liusy/Polymarket-Alternative-Data/.venv/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+[82370:MainThread](2026-10-19 16:30:45,690) INFO - qlib.Initialization - [__init__.py:75] - qlib successfully initialized based on client settings.
+[82370:MainThread](2026-10-19 16:30:45,690) INFO - qlib.Initialization - [__init__.py:77] - data_path={'__DEFAULT_FREQ': PosixPath('/home/liusy/Polymarket-Alternative-Data/data/qlib/hs300')}
+Auditing 2026-04
+/home/liusy/Polymarket-Alternative-Data/outputs/polymarket/audit_run.py:219: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  "label_available_end": (test_start - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+[82370:MainThread](2026-10-19 16:30:48,181) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[82370:MainThread](2026-10-19 16:30:48,182) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[82370:MainThread](2026-10-19 16:30:48,182) INFO - qlib.timer - [log.py:127] - Time cost: 0.001s | Init data Done
+Auditing 2026-05
+/home/liusy/Polymarket-Alternative-Data/outputs/polymarket/audit_run.py:219: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  "label_available_end": (test_start - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+[82370:MainThread](2026-10-19 16:30:49,209) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[82370:MainThread](2026-10-19 16:30:49,210) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[82370:MainThread](2026-10-19 16:30:49,210) INFO - qlib.timer - [log.py:127] - Time cost: 0.001s | Init data Done
+Auditing 2026-06
+/home/liusy/Polymarket-Alternative-Data/outputs/polymarket/audit_run.py:219: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  "label_available_end": (test_start - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+[82370:MainThread](2026-10-19 16:30:49,794) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[82370:MainThread](2026-10-19 16:30:49,794) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[82370:MainThread](2026-10-19 16:30:49,794) INFO - qlib.timer - [log.py:127] - Time cost: 0.001s | Init data Done
+{
+  "status": "partial_passed",
+  "checks_passed": 94,
+  "checks_failed": 0,
+  "audited_prediction_samples": 18000,
+  "missing_months": [
+    "2026-07",
+    "2026-08",
+    "2026-09"
+  ]
+}

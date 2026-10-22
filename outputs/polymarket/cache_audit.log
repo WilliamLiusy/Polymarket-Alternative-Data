@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "checks": {
+    "commands_succeeded": true,
+    "factor_panel_reused": true,
+    "all_six_months_reused": true,
+    "no_training_epochs_executed": true,
+    "panel_and_monthly_artifacts_unchanged": true
+  },
+  "changed_files": []
+}

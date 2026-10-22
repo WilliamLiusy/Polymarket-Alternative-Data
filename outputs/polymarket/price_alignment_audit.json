@@ -1,0 +1,42 @@
+{
+  "factor_version": 3,
+  "market_days": 9696,
+  "quote_value_changes_from_previous_alignment": 379,
+  "selected_quote_sources": {
+    "clob": 9686,
+    "<NA>": 10
+  },
+  "data_v2_exact_tick_selected_rows": 0,
+  "valid_quotes_before": 9686,
+  "valid_quotes_after": 9686,
+  "all_selected_quotes_available_by_cutoff": true,
+  "factor_value_change_counts": {
+    "direction.PROB": 21,
+    "direction.ENTROPY": 21,
+    "direction.DIRECTION_SCORE": 21,
+    "direction.DIRECTION_CERTAINTY": 21,
+    "direction.WINDOW_LENGTH": 0,
+    "direction.TIME_TO_END": 0,
+    "threshold.PROB": 164,
+    "threshold.ENTROPY": 164,
+    "threshold.THRESHOLD_REL_POSITION": 0,
+    "threshold.THRESHOLD_ADJACENT_MASS": 208,
+    "threshold.THRESHOLD_REL_DENSITY": 208,
+    "touch.HIGH_PROB": 103,
+    "touch.HIGH_D1": 145,
+    "touch.HIGH_REL_POSITION": 0,
+    "touch.LOW_PROB": 89,
+    "touch.LOW_D1": 123,
+    "touch.LOW_REL_POSITION": 0,
+    "touch.ENTROPY": 192,
+    "range.PROB": 0,
+    "range.D1": 0,
+    "range.D5": 0,
+    "range.RANGE_REL_WIDTH": 0,
+    "range.RANGE_REL_DENSITY": 0,
+    "record.HIGH_PROB": 2,
+    "record.HIGH_D1": 4,
+    "record.HIGH_D5": 4,
+    "record.ENTROPY": 2
+  }
+}

@@ -1,0 +1,104 @@
+2026-10-19 16:17:07,898 INFO 开始 train
+[79135:MainThread](2026-10-19 16:17:10,898) INFO - qlib.Initialization - [config.py:452] - default_conf: client.
+2026/10/19 16:17:11 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /home/liusy/Polymarket-Alternative-Data/.venv/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+[79135:MainThread](2026-10-19 16:17:11,434) INFO - qlib.Initialization - [__init__.py:75] - qlib successfully initialized based on client settings.
+[79135:MainThread](2026-10-19 16:17:11,434) INFO - qlib.Initialization - [__init__.py:77] - data_path={'__DEFAULT_FREQ': PosixPath('/home/liusy/Polymarket-Alternative-Data/data/qlib/hs300')}
+[79135:MainThread](2026-10-19 16:17:44,530) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[79135:MainThread](2026-10-19 16:17:44,531) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[79135:MainThread](2026-10-19 16:17:44,532) INFO - qlib.timer - [log.py:127] - Time cost: 0.002s | Init data Done
+Training Polymarket 2026-04: {'train': ('2008-01-01', '2026-03-27'), 'test': ('2026-04-01', '2026-04-30')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9959959771949963}
+PolymarketModel epoch 2: {'epoch': 2, 'train_mse': 0.9938416393609661}
+PolymarketModel epoch 3: {'epoch': 3, 'train_mse': 0.9934589861721924}
+PolymarketModel epoch 4: {'epoch': 4, 'train_mse': 0.9931233111179071}
+PolymarketModel epoch 5: {'epoch': 5, 'train_mse': 0.992841741403527}
+PolymarketModel epoch 6: {'epoch': 6, 'train_mse': 0.9926746776711247}
+PolymarketModel epoch 7: {'epoch': 7, 'train_mse': 0.9924529268034155}
+PolymarketModel epoch 8: {'epoch': 8, 'train_mse': 0.9923307491479189}
+PolymarketModel epoch 9: {'epoch': 9, 'train_mse': 0.9922135983144361}
+PolymarketModel epoch 10: {'epoch': 10, 'train_mse': 0.9920474235476779}
+[79135:MainThread](2026-10-19 16:21:57,049) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[79135:MainThread](2026-10-19 16:21:57,050) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[79135:MainThread](2026-10-19 16:21:57,050) INFO - qlib.timer - [log.py:127] - Time cost: 0.001s | Init data Done
+Training Polymarket 2026-05: {'train': ('2008-01-01', '2026-04-28'), 'test': ('2026-05-01', '2026-05-31')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9958159515356679}
+PolymarketModel epoch 2: {'epoch': 2, 'train_mse': 0.9938107810286583}
+PolymarketModel epoch 3: {'epoch': 3, 'train_mse': 0.9934257568045491}
+PolymarketModel epoch 4: {'epoch': 4, 'train_mse': 0.9931283987717947}
+PolymarketModel epoch 5: {'epoch': 5, 'train_mse': 0.9928278813770126}
+PolymarketModel epoch 6: {'epoch': 6, 'train_mse': 0.9925994726981965}
+PolymarketModel epoch 7: {'epoch': 7, 'train_mse': 0.992438282063526}
+PolymarketModel epoch 8: {'epoch': 8, 'train_mse': 0.9922914044454679}
+PolymarketModel epoch 9: {'epoch': 9, 'train_mse': 0.992169020294371}
+PolymarketModel epoch 10: {'epoch': 10, 'train_mse': 0.9920718046661793}
+[79135:MainThread](2026-10-19 16:26:18,313) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[79135:MainThread](2026-10-19 16:26:18,315) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[79135:MainThread](2026-10-19 16:26:18,315) INFO - qlib.timer - [log.py:127] - Time cost: 0.003s | Init data Done
+Training Polymarket 2026-06: {'train': ('2008-01-01', '2026-05-27'), 'test': ('2026-06-01', '2026-06-30')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9959528766060495}
+PolymarketModel epoch 2: {'epoch': 2, 'train_mse': 0.9939464427276136}
+PolymarketModel epoch 3: {'epoch': 3, 'train_mse': 0.9934999182563722}
+PolymarketModel epoch 4: {'epoch': 4, 'train_mse': 0.9931621804365183}
+PolymarketModel epoch 5: {'epoch': 5, 'train_mse': 0.992629129239231}
+PolymarketModel epoch 6: {'epoch': 6, 'train_mse': 0.9924943349688148}
+PolymarketModel epoch 7: {'epoch': 7, 'train_mse': 0.9922731650067866}
+PolymarketModel epoch 8: {'epoch': 8, 'train_mse': 0.9921780235657021}
+PolymarketModel epoch 9: {'epoch': 9, 'train_mse': 0.9920610038194129}
+PolymarketModel epoch 10: {'epoch': 10, 'train_mse': 0.9918856326262496}
+[79135:MainThread](2026-10-19 16:30:14,431) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[79135:MainThread](2026-10-19 16:30:14,433) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[79135:MainThread](2026-10-19 16:30:14,434) INFO - qlib.timer - [log.py:127] - Time cost: 0.011s | Init data Done
+Training Polymarket 2026-07: {'train': ('2008-01-01', '2026-06-26'), 'test': ('2026-07-01', '2026-07-31')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9958555853382958}
+PolymarketModel epoch 2: {'epoch': 2, 'train_mse': 0.9940839128309485}
+PolymarketModel epoch 3: {'epoch': 3, 'train_mse': 0.9936357776898405}
+PolymarketModel epoch 4: {'epoch': 4, 'train_mse': 0.9933289633796404}
+PolymarketModel epoch 5: {'epoch': 5, 'train_mse': 0.9929389274245719}
+PolymarketModel epoch 6: {'epoch': 6, 'train_mse': 0.9928253938611968}
+PolymarketModel epoch 7: {'epoch': 7, 'train_mse': 0.9925198703492055}
+PolymarketModel epoch 8: {'epoch': 8, 'train_mse': 0.992393543800442}
+PolymarketModel epoch 9: {'epoch': 9, 'train_mse': 0.992363293160742}
+PolymarketModel epoch 10: {'epoch': 10, 'train_mse': 0.9922392207322033}
+[79135:MainThread](2026-10-19 16:34:23,947) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[79135:MainThread](2026-10-19 16:34:23,955) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[79135:MainThread](2026-10-19 16:34:23,955) INFO - qlib.timer - [log.py:127] - Time cost: 0.012s | Init data Done
+Training Polymarket 2026-08: {'train': ('2008-01-01', '2026-07-29'), 'test': ('2026-08-01', '2026-08-31')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9958984802267304}
+PolymarketModel epoch 2: {'epoch': 2, 'train_mse': 0.994106871023723}
+PolymarketModel epoch 3: {'epoch': 3, 'train_mse': 0.993590282355725}
+PolymarketModel epoch 4: {'epoch': 4, 'train_mse': 0.9932850679583536}
+PolymarketModel epoch 5: {'epoch': 5, 'train_mse': 0.9929891604968089}
+PolymarketModel epoch 6: {'epoch': 6, 'train_mse': 0.9928341315895597}
+PolymarketModel epoch 7: {'epoch': 7, 'train_mse': 0.9925971885048533}
+PolymarketModel epoch 8: {'epoch': 8, 'train_mse': 0.9925361984228849}
+PolymarketModel epoch 9: {'epoch': 9, 'train_mse': 0.9923929924848043}
+PolymarketModel epoch 10: {'epoch': 10, 'train_mse': 0.9922858313732595}
+[79135:MainThread](2026-10-19 16:38:29,089) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[79135:MainThread](2026-10-19 16:38:29,090) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[79135:MainThread](2026-10-19 16:38:29,091) INFO - qlib.timer - [log.py:127] - Time cost: 0.002s | Init data Done
+Training Polymarket 2026-09: {'train': ('2008-01-01', '2026-08-27'), 'test': ('2026-09-01', '2026-09-30')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9957293049271441}
+PolymarketModel epoch 2: {'epoch': 2, 'train_mse': 0.9940672753335621}
+PolymarketModel epoch 3: {'epoch': 3, 'train_mse': 0.9936964341903194}
+PolymarketModel epoch 4: {'epoch': 4, 'train_mse': 0.9934078588398803}
+PolymarketModel epoch 5: {'epoch': 5, 'train_mse': 0.9931838821669411}
+PolymarketModel epoch 6: {'epoch': 6, 'train_mse': 0.9929731241765266}
+PolymarketModel epoch 7: {'epoch': 7, 'train_mse': 0.992827886030335}
+PolymarketModel epoch 8: {'epoch': 8, 'train_mse': 0.992757505739346}
+PolymarketModel epoch 9: {'epoch': 9, 'train_mse': 0.9926908805097695}
+PolymarketModel epoch 10: {'epoch': 10, 'train_mse': 0.9925384469911588}
+{
+  "ic_mean": 0.03063611022733189,
+  "ic_std": 0.16151808341984075,
+  "ic_ir": 0.18967603861233395,
+  "rank_ic_mean": 0.020514629123196897,
+  "prediction_days": 125,
+  "evaluated_days": 123,
+  "evaluated_samples": 36849,
+  "training_scheme": "expanding_monthly_fixed_epochs",
+  "fingerprint": "5b7de59969761900de39d615e7ca0679d29094dfb4e6f7b32259105c7665b607",
+  "months": 6,
+  "prediction_samples": 37500,
+  "membership_source": "baostock",
+  "membership_note": "BaoStock historical CSI 300 snapshots update weekly. Files are queried as of each trading date; updateDate is retained and is not an official index effective date."
+}

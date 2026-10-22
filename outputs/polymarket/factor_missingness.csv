@@ -1,0 +1,28 @@
+category,factor,total_slots,finite_slots,missing_slots,natural_language_missing_slots,structural_missing_slots,other_missing_slots,missing_reason_counts
+direction,PROB,129,129,0,0,0,0,{}
+direction,ENTROPY,129,129,0,0,0,0,{}
+direction,DIRECTION_SCORE,129,129,0,0,0,0,{}
+direction,DIRECTION_CERTAINTY,129,129,0,0,0,0,{}
+direction,WINDOW_LENGTH,129,119,10,10,0,0,"{""natural_language_unsupported_cme_settlement_schedule"": 1, ""natural_language_unsupported_ice_wti_exchange_calendar"": 9}"
+direction,TIME_TO_END,129,119,10,10,0,0,"{""natural_language_unsupported_cme_settlement_schedule"": 1, ""natural_language_unsupported_ice_wti_exchange_calendar"": 9}"
+threshold,PROB,1210,1210,0,0,0,0,{}
+threshold,ENTROPY,1210,1210,0,0,0,0,{}
+threshold,THRESHOLD_REL_POSITION,1210,1210,0,0,0,0,{}
+threshold,THRESHOLD_ADJACENT_MASS,1210,1022,188,0,110,78,"{""negative_adjacent_probability_mass"": 78, ""structural_highest_threshold_has_no_next_neighbor"": 110}"
+threshold,THRESHOLD_REL_DENSITY,1210,1022,188,0,110,78,"{""negative_adjacent_probability_mass"": 78, ""structural_highest_threshold_has_no_next_neighbor"": 110}"
+touch,HIGH_PROB,6953,3385,3568,0,3558,10,"{""quote_absent_at_or_before_cutoff"": 10, ""structural_opposite_touch_side"": 3558}"
+touch,HIGH_D1,6953,3042,3911,0,3558,353,"{""insufficient_prior_active_market_history"": 343, ""quote_absent_at_or_before_cutoff"": 10, ""structural_opposite_touch_side"": 3558}"
+touch,HIGH_REL_POSITION,6953,3136,3817,0,3558,259,"{""insufficient_distinct_group_price_levels"": 259, ""structural_opposite_touch_side"": 3558}"
+touch,LOW_PROB,6953,3558,3395,0,3395,0,"{""structural_opposite_touch_side"": 3395}"
+touch,LOW_D1,6953,3236,3717,0,3395,322,"{""insufficient_prior_active_market_history"": 322, ""structural_opposite_touch_side"": 3395}"
+touch,LOW_REL_POSITION,6953,3360,3593,0,3395,198,"{""insufficient_distinct_group_price_levels"": 198, ""structural_opposite_touch_side"": 3395}"
+touch,ENTROPY,6953,6943,10,0,0,10,"{""quote_absent_at_or_before_cutoff"": 10}"
+range,PROB,1104,1104,0,0,0,0,{}
+range,D1,1104,1088,16,0,0,16,"{""insufficient_prior_active_market_history"": 16}"
+range,D5,1104,1024,80,0,0,80,"{""insufficient_prior_active_market_history"": 80}"
+range,RANGE_REL_WIDTH,1104,1104,0,0,0,0,{}
+range,RANGE_REL_DENSITY,1104,1104,0,0,0,0,{}
+record,HIGH_PROB,300,300,0,0,0,0,{}
+record,HIGH_D1,300,294,6,0,0,6,"{""insufficient_prior_active_market_history"": 6}"
+record,HIGH_D5,300,270,30,0,0,30,"{""insufficient_prior_active_market_history"": 30}"
+record,ENTROPY,300,300,0,0,0,0,{}

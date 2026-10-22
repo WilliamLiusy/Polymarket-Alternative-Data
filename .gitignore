@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 akshare/
 data/
-outputs/
+outputs/*
+!outputs/polymarket/
 mlruns/
 *.egg-info/

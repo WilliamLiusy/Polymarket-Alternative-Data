@@ -169,14 +169,14 @@ data/polymarket_factors/
   factors.parquet
   manifest.json
 outputs/polymarket/
-  YYYY-MM/model.pkl
-  YYYY-MM/sensitivities.csv
-  YYYY-MM/training_history.csv
-  YYYY-MM/predictions.parquet
-  YYYY-MM/daily_ic.csv
-  YYYY-MM/run.json
-  daily_ic.csv / monthly_ic.csv / predictions.parquet / summary.json
+  YYYYMMDDTHHMMSSffffff/          # 每次 CLI train / all 运行的上海时间戳
+    YYYY-MM/
+      model.pkl / sensitivities.csv / training_history.csv
+      predictions.parquet / daily_ic.csv / run.json
+    daily_ic.csv / monthly_ic.csv / predictions.parquet / summary.json
 ```
+
+Polymarket 的 `output_dir` 是运行结果的父目录。CLI 执行 `train` 或 `all` 时，会在其中新建一个精确到微秒的北京时间目录，避免不同运行覆盖彼此；该目录纳入 Git 跟踪。
 
 规则分类排除汽油、Brent 等非目标市场；不根据数组位置猜测 Yes/Up token。收盘阈值必须有收盘或结算语义；无法判断触价方向、多重障碍或缺纪录门槛的市场进入复核清单。可复制 `configs/polymarket_overrides.example.yaml`，按真实 market ID 补充类别、价格口径、原始观察窗口和门槛，然后设置 `classification.overrides_file` 并重跑 `classify`。开放尾部写成字符串 `'-inf'` / `'inf'`，以保持标准 JSON。修订规则元数据时需依原始合约核实，不能填入事后结果。
 

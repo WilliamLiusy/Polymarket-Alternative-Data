@@ -1,0 +1,30 @@
+{
+  "source": "https://data-api.polymarket.com/v2/openapi.json",
+  "retrieved_at": "2026-10-19T08:07:26.287001+00:00",
+  "PricePoint": {
+    "type": "object",
+    "description": "One served point.",
+    "required": [
+      "timestamp",
+      "price",
+      "resolution_seconds"
+    ],
+    "properties": {
+      "price": {
+        "type": "number",
+        "format": "double",
+        "description": "Price in the range 0…1. Always a JSON number."
+      },
+      "resolution_seconds": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Width of the window this price was observed in: `0` for an exact tick,\nthe bucket width for an aggregate. So the price was observed within\n`[timestamp, timestamp + resolution_seconds)`, and a caller can tell\nwhether that is precise enough.\n\nPer-point rather than per-response because points in one response\ngenuinely differ: grid points carry the requested bucket width, the\nseries' terminal point is an exact tick at `0`, and a tier-degraded\n`as_of` carries its tier's width.\n\nThis is the ONLY thing the payload says about provenance, deliberately."
+      },
+      "timestamp": {
+        "type": "integer",
+        "format": "int64",
+        "description": "The OBSERVATION's own time, epoch seconds, never the time that was\nasked for. A raw tick reports the tick; an aggregate reports its bucket\nstart."
+      }
+    }
+  }
+}

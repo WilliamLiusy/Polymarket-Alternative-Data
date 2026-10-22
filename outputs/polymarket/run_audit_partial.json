@@ -1,0 +1,511 @@
+{
+  "audited_at": "2026-10-19T08:30:50.193284+00:00",
+  "status": "partial_passed",
+  "complete": false,
+  "model_replay": true,
+  "completed_months": [
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "missing_months": [
+    "2026-07",
+    "2026-08",
+    "2026-09"
+  ],
+  "fingerprint": "5b7de59969761900de39d615e7ca0679d29094dfb4e6f7b32259105c7665b607",
+  "audited_prediction_samples": 18000,
+  "checks_passed": 94,
+  "checks_failed": 0,
+  "months": [
+    {
+      "month": "2026-04",
+      "test_samples": 6300,
+      "training_stocks": 849,
+      "unseen_test_stocks": [],
+      "replay_max_abs_difference": 0.0,
+      "replay_bitwise_equal": true,
+      "train_end": "2026-03-27",
+      "seconds": 275.3781611850027,
+      "ic_mean": 0.04457688820547149,
+      "rank_ic_mean": 0.034554871492777785
+    },
+    {
+      "month": "2026-05",
+      "test_samples": 5400,
+      "training_stocks": 849,
+      "unseen_test_stocks": [],
+      "replay_max_abs_difference": 0.0,
+      "replay_bitwise_equal": true,
+      "train_end": "2026-04-28",
+      "seconds": 230.8608673130002,
+      "ic_mean": 0.061404826060879075,
+      "rank_ic_mean": 0.05577634846434137
+    },
+    {
+      "month": "2026-06",
+      "test_samples": 6300,
+      "training_stocks": 849,
+      "unseen_test_stocks": [
+        "SH688072",
+        "SH688183",
+        "SH688521",
+        "SZ000657",
+        "SZ000988",
+        "SZ001280",
+        "SZ002532",
+        "SZ002837",
+        "SZ301165",
+        "SZ301308"
+      ],
+      "replay_max_abs_difference": 0.0,
+      "replay_bitwise_equal": true,
+      "train_end": "2026-05-27",
+      "seconds": 233.9680986780004,
+      "ic_mean": 0.006803301269913512,
+      "rank_ic_mean": 0.004781778170678948
+    }
+  ],
+  "failures": [],
+  "checks": [
+    {
+      "check": "factor panel uses availability-safe version 3",
+      "passed": true
+    },
+    {
+      "check": "configured fixed 10 epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-04: required artifacts present",
+      "passed": true,
+      "missing": []
+    },
+    {
+      "check": "2026-04: completion checksums",
+      "passed": true,
+      "mismatched": []
+    },
+    {
+      "check": "2026-04: completion marker covers every artifact",
+      "passed": true
+    },
+    {
+      "check": "2026-04: marker/run fingerprints agree",
+      "passed": true
+    },
+    {
+      "check": "2026-04: expanding T+2 window",
+      "passed": true,
+      "window": {
+        "month": "2026-04",
+        "train_start": "2008-01-01",
+        "train_end": "2026-03-27",
+        "label_available_end": "2026-03-31",
+        "test_start": "2026-04-01",
+        "test_end": "2026-04-30",
+        "evaluation_end": "2026-09-28"
+      }
+    },
+    {
+      "check": "2026-04: train/test only with no validation",
+      "passed": true
+    },
+    {
+      "check": "2026-04: fixed-epoch model configuration",
+      "passed": true
+    },
+    {
+      "check": "2026-04: ten finite training epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-04: unique sorted prediction index",
+      "passed": true
+    },
+    {
+      "check": "2026-04: baseline prediction index identical",
+      "passed": true
+    },
+    {
+      "check": "2026-04: all predictions finite",
+      "passed": true
+    },
+    {
+      "check": "2026-04: label exactly equals baseline including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-04: raw_label exactly equals baseline including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-04: beyond-research T+2 labels missing",
+      "passed": true
+    },
+    {
+      "check": "2026-04: finite five-category sensitivities",
+      "passed": true
+    },
+    {
+      "check": "2026-04: independently recomputed daily IC: dates",
+      "passed": true
+    },
+    {
+      "check": "2026-04: independently recomputed daily IC: ic",
+      "passed": true
+    },
+    {
+      "check": "2026-04: independently recomputed daily IC: rank_ic",
+      "passed": true
+    },
+    {
+      "check": "2026-04: independently recomputed daily IC: n",
+      "passed": true
+    },
+    {
+      "check": "2026-04: monthly metrics",
+      "passed": true,
+      "mismatches": {}
+    },
+    {
+      "check": "2026-04: loaded model schema",
+      "passed": true
+    },
+    {
+      "check": "2026-04: loaded model trained epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-04: finite model parameters",
+      "passed": true
+    },
+    {
+      "check": "2026-04: unseen-stock sensitivity row is exactly one",
+      "passed": true
+    },
+    {
+      "check": "2026-04: sensitivity CSV equals loaded model",
+      "passed": true
+    },
+    {
+      "check": "2026-04: unobserved category stays neutral: threshold",
+      "passed": true
+    },
+    {
+      "check": "2026-04: prediction index equals filtered Alpha158 test rows",
+      "passed": true
+    },
+    {
+      "check": "2026-04: label equals cached label including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-04: raw_label equals cached label including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-04: reloaded model prediction replay",
+      "passed": true,
+      "samples": 6300,
+      "max_abs_difference": 0.0,
+      "bitwise_equal": true,
+      "feature_rows_loaded": 6300
+    },
+    {
+      "check": "2026-04: unknown stock maps to neutral embedding",
+      "passed": true,
+      "actual_unseen_test_stocks": []
+    },
+    {
+      "check": "2026-05: required artifacts present",
+      "passed": true,
+      "missing": []
+    },
+    {
+      "check": "2026-05: completion checksums",
+      "passed": true,
+      "mismatched": []
+    },
+    {
+      "check": "2026-05: completion marker covers every artifact",
+      "passed": true
+    },
+    {
+      "check": "2026-05: marker/run fingerprints agree",
+      "passed": true
+    },
+    {
+      "check": "2026-05: expanding T+2 window",
+      "passed": true,
+      "window": {
+        "month": "2026-05",
+        "train_start": "2008-01-01",
+        "train_end": "2026-04-28",
+        "label_available_end": "2026-04-30",
+        "test_start": "2026-05-01",
+        "test_end": "2026-05-31",
+        "evaluation_end": "2026-09-28"
+      }
+    },
+    {
+      "check": "2026-05: train/test only with no validation",
+      "passed": true
+    },
+    {
+      "check": "2026-05: fixed-epoch model configuration",
+      "passed": true
+    },
+    {
+      "check": "2026-05: ten finite training epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-05: unique sorted prediction index",
+      "passed": true
+    },
+    {
+      "check": "2026-05: baseline prediction index identical",
+      "passed": true
+    },
+    {
+      "check": "2026-05: all predictions finite",
+      "passed": true
+    },
+    {
+      "check": "2026-05: label exactly equals baseline including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-05: raw_label exactly equals baseline including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-05: beyond-research T+2 labels missing",
+      "passed": true
+    },
+    {
+      "check": "2026-05: finite five-category sensitivities",
+      "passed": true
+    },
+    {
+      "check": "2026-05: independently recomputed daily IC: dates",
+      "passed": true
+    },
+    {
+      "check": "2026-05: independently recomputed daily IC: ic",
+      "passed": true
+    },
+    {
+      "check": "2026-05: independently recomputed daily IC: rank_ic",
+      "passed": true
+    },
+    {
+      "check": "2026-05: independently recomputed daily IC: n",
+      "passed": true
+    },
+    {
+      "check": "2026-05: monthly metrics",
+      "passed": true,
+      "mismatches": {}
+    },
+    {
+      "check": "2026-05: loaded model schema",
+      "passed": true
+    },
+    {
+      "check": "2026-05: loaded model trained epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-05: finite model parameters",
+      "passed": true
+    },
+    {
+      "check": "2026-05: unseen-stock sensitivity row is exactly one",
+      "passed": true
+    },
+    {
+      "check": "2026-05: sensitivity CSV equals loaded model",
+      "passed": true
+    },
+    {
+      "check": "2026-05: prediction index equals filtered Alpha158 test rows",
+      "passed": true
+    },
+    {
+      "check": "2026-05: label equals cached label including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-05: raw_label equals cached label including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-05: reloaded model prediction replay",
+      "passed": true,
+      "samples": 5400,
+      "max_abs_difference": 0.0,
+      "bitwise_equal": true,
+      "feature_rows_loaded": 5400
+    },
+    {
+      "check": "2026-05: unknown stock maps to neutral embedding",
+      "passed": true,
+      "actual_unseen_test_stocks": []
+    },
+    {
+      "check": "2026-06: required artifacts present",
+      "passed": true,
+      "missing": []
+    },
+    {
+      "check": "2026-06: completion checksums",
+      "passed": true,
+      "mismatched": []
+    },
+    {
+      "check": "2026-06: completion marker covers every artifact",
+      "passed": true
+    },
+    {
+      "check": "2026-06: marker/run fingerprints agree",
+      "passed": true
+    },
+    {
+      "check": "2026-06: expanding T+2 window",
+      "passed": true,
+      "window": {
+        "month": "2026-06",
+        "train_start": "2008-01-01",
+        "train_end": "2026-05-27",
+        "label_available_end": "2026-05-31",
+        "test_start": "2026-06-01",
+        "test_end": "2026-06-30",
+        "evaluation_end": "2026-09-28"
+      }
+    },
+    {
+      "check": "2026-06: train/test only with no validation",
+      "passed": true
+    },
+    {
+      "check": "2026-06: fixed-epoch model configuration",
+      "passed": true
+    },
+    {
+      "check": "2026-06: ten finite training epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-06: unique sorted prediction index",
+      "passed": true
+    },
+    {
+      "check": "2026-06: baseline prediction index identical",
+      "passed": true
+    },
+    {
+      "check": "2026-06: all predictions finite",
+      "passed": true
+    },
+    {
+      "check": "2026-06: label exactly equals baseline including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-06: raw_label exactly equals baseline including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-06: beyond-research T+2 labels missing",
+      "passed": true
+    },
+    {
+      "check": "2026-06: finite five-category sensitivities",
+      "passed": true
+    },
+    {
+      "check": "2026-06: independently recomputed daily IC: dates",
+      "passed": true
+    },
+    {
+      "check": "2026-06: independently recomputed daily IC: ic",
+      "passed": true
+    },
+    {
+      "check": "2026-06: independently recomputed daily IC: rank_ic",
+      "passed": true
+    },
+    {
+      "check": "2026-06: independently recomputed daily IC: n",
+      "passed": true
+    },
+    {
+      "check": "2026-06: monthly metrics",
+      "passed": true,
+      "mismatches": {}
+    },
+    {
+      "check": "2026-06: loaded model schema",
+      "passed": true
+    },
+    {
+      "check": "2026-06: loaded model trained epochs",
+      "passed": true
+    },
+    {
+      "check": "2026-06: finite model parameters",
+      "passed": true
+    },
+    {
+      "check": "2026-06: unseen-stock sensitivity row is exactly one",
+      "passed": true
+    },
+    {
+      "check": "2026-06: sensitivity CSV equals loaded model",
+      "passed": true
+    },
+    {
+      "check": "2026-06: prediction index equals filtered Alpha158 test rows",
+      "passed": true
+    },
+    {
+      "check": "2026-06: label equals cached label including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-06: raw_label equals cached label including NaN",
+      "passed": true
+    },
+    {
+      "check": "2026-06: reloaded model prediction replay",
+      "passed": true,
+      "samples": 6300,
+      "max_abs_difference": 0.0,
+      "bitwise_equal": true,
+      "feature_rows_loaded": 6300
+    },
+    {
+      "check": "2026-06: unknown stock maps to neutral embedding",
+      "passed": true,
+      "actual_unseen_test_stocks": [
+        "SH688072",
+        "SH688183",
+        "SH688521",
+        "SZ000657",
+        "SZ000988",
+        "SZ001280",
+        "SZ002532",
+        "SZ002837",
+        "SZ301165",
+        "SZ301308"
+      ]
+    },
+    {
+      "check": "all completed months share one fingerprint",
+      "passed": true
+    }
+  ],
+  "memory_policy": "Only filtered monthly test Alpha158 rows and one saved model are loaded; no training set is assembled."
+}

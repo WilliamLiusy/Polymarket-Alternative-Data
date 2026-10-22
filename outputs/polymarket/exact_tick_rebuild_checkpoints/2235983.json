@@ -1,0 +1,98 @@
+{
+  "market_id": "2235983",
+  "market_dir": "touch/cl-hit-jun-2026--125877/will-crude-oil-cl-hit-high-105-by-end-of-june-466-694--2235983",
+  "status": "complete",
+  "started_at": "2026-10-19T08:09:27.435601+00:00",
+  "completed_at": "2026-10-19T08:09:27.855353+00:00",
+  "source_identity": {
+    "yes_token_id": "53780290868665757710978640457425650271030932155082956914783893460286985208367",
+    "no_token_id": "40238449775969340114449459362066437446954344358641712663996764182631322800184",
+    "condition_id": "0x86c4455035d81c512138b8e38ade7defdb46708d3ee43098cdc8429a7d3b9bd9",
+    "created_at": null,
+    "opened_at": "2026-05-12T01:12:14+00:00",
+    "metadata_available_at": "2026-05-11T23:51:07.064310+00:00",
+    "closed_at": "2026-07-01T07:10:58+00:00",
+    "sdk_version": "0.13.0",
+    "raw_created_at": null,
+    "raw_start_date": null,
+    "raw_closed_time": null,
+    "data_url": "https://data-api.polymarket.com",
+    "clob_url": "https://clob.polymarket.com",
+    "price_chunk_days": 15
+  },
+  "collected_at": "2026-10-19T06:59:53.976903+00:00",
+  "settings": {
+    "events_file": null,
+    "event_tag_slug": "oil",
+    "timeout": 30,
+    "retries": 3,
+    "pause": 0.15,
+    "workers": 16,
+    "event_page_size": 100,
+    "trade_page_size": 1000,
+    "price_page_size": 10000,
+    "price_chunk_days": 15,
+    "data_url": "https://data-api.polymarket.com",
+    "clob_url": "https://clob.polymarket.com"
+  },
+  "settings_provenance": "Config snapshot, with original source_identity chunk/API settings authoritative",
+  "sides": {
+    "yes": {
+      "before": {
+        "rows": 72175,
+        "exact_tick_rows": 0,
+        "sha256": "b697473aacf95b43c11987a4910ecd0115352f26f9350fbd8559b35251622ab6",
+        "size": 1797300
+      },
+      "after": {
+        "rows": 72179,
+        "exact_tick_rows": 4,
+        "sha256": "2ba802b309aa2ce3a2a996e513209989870363c69eff1e401d41d1e4035b073b",
+        "size": 1797400
+      },
+      "row_increment": 4,
+      "exact_tick_row_increment": 4,
+      "raw_pages_read": 20,
+      "raw_points_read": 72179,
+      "raw_exact_tick_points_before_dedup_and_time_filter": 4,
+      "requested_start": 1778543467,
+      "requested_end": 1782976258
+    },
+    "no": {
+      "before": {
+        "rows": 72175,
+        "exact_tick_rows": 0,
+        "sha256": "2782b90d43c4356db8ec2865f7510757cd9de75ad6a42f46c1a9753750aa758a",
+        "size": 1797300
+      },
+      "after": {
+        "rows": 72179,
+        "exact_tick_rows": 4,
+        "sha256": "190370dc5a2c20405f6a45b43444f3d2b86462452b09b09c631883d089d75a34",
+        "size": 1797400
+      },
+      "row_increment": 4,
+      "exact_tick_row_increment": 4,
+      "raw_pages_read": 20,
+      "raw_points_read": 72179,
+      "raw_exact_tick_points_before_dedup_and_time_filter": 4,
+      "requested_start": 1778543467,
+      "requested_end": 1782976258
+    }
+  },
+  "artifacts": {
+    "yes_prices.csv": {
+      "size": 1797400,
+      "mtime_ns": 1792397367655666200
+    },
+    "no_prices.csv": {
+      "size": 1797400,
+      "mtime_ns": 1792397367846404815
+    },
+    "trades.jsonl": {
+      "size": 3637665,
+      "mtime_ns": 1792393230178138591
+    }
+  },
+  "trades_sha256": "8f5f3d11ee2b64295b4b4bc0337850c4ffc2c5321b93a960e11a527c6622749e"
+}

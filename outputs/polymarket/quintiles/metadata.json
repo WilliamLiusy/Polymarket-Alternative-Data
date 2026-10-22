@@ -1,0 +1,62 @@
+{
+  "calculation": "baseline.quintiles.analyze",
+  "ranking": "Daily score descending, instrument ascending for ties; full prediction universe before label filtering",
+  "groups": "Q1 highest 20%, Q5 lowest 20%; equal weight over valid group labels",
+  "target": "Saved label: cross-sectional z-score of close(T+2)/close(T+1)-1 on prediction date T",
+  "date_axis": "prediction date T",
+  "cumulative": "Arithmetic sum of group daily means, including current date; missing dates stay NaN",
+  "models": {
+    "polymarket": {
+      "source": "outputs/polymarket/predictions.parquet",
+      "source_sha256": "0a30b8cfaa48c03c57f691e2abf544e3c29417fc9326d33c702b7a1ec6b0ebb5",
+      "prediction_rows": 37500,
+      "prediction_days": 125,
+      "evaluated_days": 123,
+      "last_evaluated_date": "2026-09-28",
+      "assigned_stocks_per_group": 60,
+      "missing_label_stock_days": 651,
+      "daily_mean_by_group": {
+        "Q1": 0.05181297084661111,
+        "Q2": 0.0005714003995279071,
+        "Q3": -4.750286955016377e-05,
+        "Q4": -0.008670184643763205,
+        "Q5": -0.04360070309405554
+      },
+      "cumulative_final_by_group": {
+        "Q1": 6.372995414133163,
+        "Q2": 0.07028224914193298,
+        "Q3": -0.005842852954669506,
+        "Q4": -1.0664327111828749,
+        "Q5": -5.3628864805688305
+      },
+      "daily_mean_q1_minus_q5": 0.09541367394066666,
+      "cumulative_q1_minus_q5": 11.735881894701999
+    },
+    "baseline": {
+      "source": "outputs/baseline/predictions.parquet",
+      "source_sha256": "27fa3c82187312f9f35dbcd01c3f8649b16014e3c8c2127de56c8a07a8009104",
+      "prediction_rows": 37500,
+      "prediction_days": 125,
+      "evaluated_days": 123,
+      "last_evaluated_date": "2026-09-28",
+      "assigned_stocks_per_group": 60,
+      "missing_label_stock_days": 651,
+      "daily_mean_by_group": {
+        "Q1": 0.031102313852795757,
+        "Q2": 0.02043726466636154,
+        "Q3": 0.0064658373822538,
+        "Q4": -0.010232553241423354,
+        "Q5": -0.047927257046008594
+      },
+      "cumulative_final_by_group": {
+        "Q1": 3.8255846038938772,
+        "Q2": 2.5137835539624684,
+        "Q3": 0.7952979980172169,
+        "Q4": -1.2586040486950731,
+        "Q5": -5.895052616659057
+      },
+      "daily_mean_q1_minus_q5": 0.07902957089880436,
+      "cumulative_q1_minus_q5": 9.720637220552936
+    }
+  }
+}

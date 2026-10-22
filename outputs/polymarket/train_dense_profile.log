@@ -1,0 +1,10 @@
+2026-10-19 15:52:58,459 INFO 开始 train
+[72720:MainThread](2026-10-19 15:53:00,094) INFO - qlib.Initialization - [config.py:452] - default_conf: client.
+2026/10/19 15:53:00 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /home/liusy/Polymarket-Alternative-Data/.venv/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+[72720:MainThread](2026-10-19 15:53:00,553) INFO - qlib.Initialization - [__init__.py:75] - qlib successfully initialized based on client settings.
+[72720:MainThread](2026-10-19 15:53:00,554) INFO - qlib.Initialization - [__init__.py:77] - data_path={'__DEFAULT_FREQ': PosixPath('/home/liusy/Polymarket-Alternative-Data/data/qlib/hs300')}
+[72720:MainThread](2026-10-19 15:53:04,549) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | Loading data Done
+[72720:MainThread](2026-10-19 15:53:04,550) INFO - qlib.timer - [log.py:127] - Time cost: 0.000s | fit & process data Done
+[72720:MainThread](2026-10-19 15:53:04,550) INFO - qlib.timer - [log.py:127] - Time cost: 0.002s | Init data Done
+Training Polymarket 2026-04: {'train': ('2008-01-01', '2026-03-27'), 'test': ('2026-04-01', '2026-04-30')}
+PolymarketModel epoch 1: {'epoch': 1, 'train_mse': 0.9959959766782936}

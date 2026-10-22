@@ -1,10 +1,11 @@
 """Run ``python -m polymarket_ext <stage> --config configs/polymarket.yaml``."""
 
 import argparse
-from datetime import date
+from datetime import date, datetime
 import json
 import logging
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -33,6 +34,13 @@ def load_config(path):
     return config
 
 
+def timestamped_output_dir(output_dir, now=None):
+    """Return a unique per-run output directory using Beijing local time."""
+    now = now or datetime.now(ZoneInfo("Asia/Shanghai"))
+    run_id = now.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y%m%dT%H%M%S%f")
+    return Path(output_dir) / run_id
+
+
 def main():
     parser = argparse.ArgumentParser(description="Polymarket 原油数据、收盘因子与 Qlib 敏感度模型")
     parser.add_argument("command", choices=("discover", "classify", "download", "prepare", "train", "all"))
@@ -42,6 +50,9 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config = load_config(args.config)
     stages = ("discover", "classify", "download", "prepare", "train") if args.command == "all" else (args.command,)
+    if "train" in stages:
+        config["output_dir"] = str(timestamped_output_dir(config["output_dir"]))
+        logging.info("本次训练输出目录：%s", config["output_dir"])
     for stage in stages:
         if stage == "discover":
             from .collect import discover as run

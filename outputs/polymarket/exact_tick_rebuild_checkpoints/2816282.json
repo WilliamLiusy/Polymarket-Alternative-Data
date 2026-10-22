@@ -1,0 +1,98 @@
+{
+  "market_id": "2816282",
+  "market_dir": "threshold/wti-closes-above-on-july-7-2026--672913/wti-closes-above-67-on-july-7-2026--2816282",
+  "status": "complete",
+  "started_at": "2026-10-19T08:11:05.859055+00:00",
+  "completed_at": "2026-10-19T08:11:05.885661+00:00",
+  "source_identity": {
+    "yes_token_id": "71667912953624717443835577692056667710556218239155022635410322500151862197976",
+    "no_token_id": "90773132087719615178574487778543530794398763136916511957176419291154153287775",
+    "condition_id": "0x1fee3ec5afd56ef127d78c644665513db3fe7b11e1294d6d5478b1806258e8b9",
+    "created_at": null,
+    "opened_at": "2026-07-06T12:00:34+00:00",
+    "metadata_available_at": "2026-07-06T12:00:10.050580+00:00",
+    "closed_at": "2026-07-07T23:04:16+00:00",
+    "sdk_version": "0.13.0",
+    "raw_created_at": null,
+    "raw_start_date": null,
+    "raw_closed_time": null,
+    "data_url": "https://data-api.polymarket.com",
+    "clob_url": "https://clob.polymarket.com",
+    "price_chunk_days": 15
+  },
+  "collected_at": "2026-10-19T07:13:29.450837+00:00",
+  "settings": {
+    "events_file": null,
+    "event_tag_slug": "oil",
+    "timeout": 30,
+    "retries": 3,
+    "pause": 0.15,
+    "workers": 16,
+    "event_page_size": 100,
+    "trade_page_size": 1000,
+    "price_page_size": 10000,
+    "price_chunk_days": 15,
+    "data_url": "https://data-api.polymarket.com",
+    "clob_url": "https://clob.polymarket.com"
+  },
+  "settings_provenance": "Config snapshot, with original source_identity chunk/API settings authoritative",
+  "sides": {
+    "yes": {
+      "before": {
+        "rows": 2101,
+        "exact_tick_rows": 0,
+        "sha256": "88c561da450b6ff10d85aef5f025e51854ded4990fd29233f855374d8004482b",
+        "size": 51816
+      },
+      "after": {
+        "rows": 2102,
+        "exact_tick_rows": 1,
+        "sha256": "6e4f27a6c8c6601f133ebfff88eccbfbb2843d2cdb67f1828bc1b7062c0ec044",
+        "size": 51841
+      },
+      "row_increment": 1,
+      "exact_tick_row_increment": 1,
+      "raw_pages_read": 5,
+      "raw_points_read": 2102,
+      "raw_exact_tick_points_before_dedup_and_time_filter": 1,
+      "requested_start": 1783339210,
+      "requested_end": 1783551856
+    },
+    "no": {
+      "before": {
+        "rows": 2101,
+        "exact_tick_rows": 0,
+        "sha256": "73e6fc66071e8858598712700be449b7ff548b0d8e85faa82d813906ab00876a",
+        "size": 51812
+      },
+      "after": {
+        "rows": 2102,
+        "exact_tick_rows": 1,
+        "sha256": "715d8f128df93757ad2250b2efd61e8903503564cd4540799cb91bd08468c2bd",
+        "size": 51837
+      },
+      "row_increment": 1,
+      "exact_tick_row_increment": 1,
+      "raw_pages_read": 5,
+      "raw_points_read": 2102,
+      "raw_exact_tick_points_before_dedup_and_time_filter": 1,
+      "requested_start": 1783339210,
+      "requested_end": 1783551856
+    }
+  },
+  "artifacts": {
+    "yes_prices.csv": {
+      "size": 51841,
+      "mtime_ns": 1792397465871693692
+    },
+    "no_prices.csv": {
+      "size": 51837,
+      "mtime_ns": 1792397465884051202
+    },
+    "trades.jsonl": {
+      "size": 37642,
+      "mtime_ns": 1792394016134004913
+    }
+  },
+  "trades_sha256": "6fa7e0cd8ce7376835973ae55a799f8d0d175b6f1991773e8c55c4efaee97fe7"
+}

@@ -1,0 +1,13 @@
+{
+  "fingerprint": "65f80d16998128bd4fc72cf52489e1135e9d4b39a2dd28462f5879077bc386bb",
+  "artifacts": {
+    "config.json": "b435943145fc390ad5801fd3f8dace48b2adce0067e5a94071a4ec41ba216f95",
+    "run.json": "8b4cab79c14e32d852272e937e96a4e1b6052b681b9882c5c68bfa48846302ab",
+    "daily_ic.csv": "47eb45f7e7de94aa5522e247051db09615c7d6383e6a3da4205210d6d9afd638",
+    "sensitivities.csv": "48e2e06588774648ae42a3244f729cd6742c4f47cfb2b2c356ac84a59506c0ed",
+    "metrics.json": "86f1df94a058194e66099c74f439672b8bed815274c5019c85f25ae165f52ab9",
+    "training_history.csv": "6b9d0944493929bdf683fa5cea00a87ad880254d40ce2eb48029ca9e245d3753",
+    "predictions.parquet": "d93111171f328ece1fa6244698b77a19cf678120785c345978dafa433af17360",
+    "model.pkl": "6e8c7666afd04c1c613db2d5c3fcd99fe0109fcffe40ece1cf9cf876815b135e"
+  }
+}

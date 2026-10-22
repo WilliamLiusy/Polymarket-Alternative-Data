@@ -1,0 +1,77 @@
+{
+  "window": {
+    "month": "2026-07",
+    "train_start": "2008-01-01",
+    "train_end": "2026-06-26",
+    "label_available_end": "2026-06-30",
+    "test_start": "2026-07-01",
+    "test_end": "2026-07-31",
+    "evaluation_end": "2026-09-28"
+  },
+  "segments": {
+    "train": [
+      "2008-01-01",
+      "2026-06-26"
+    ],
+    "test": [
+      "2026-07-01",
+      "2026-07-31"
+    ]
+  },
+  "trained_epochs": 10,
+  "model": {
+    "epochs": 10,
+    "batch_size": 512,
+    "hidden_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "num_threads": 2,
+    "seed": 42,
+    "sensitivity_l2": 0.001
+  },
+  "training_scheme": "expanding_monthly_fixed_epochs",
+  "input_schema_version": 3,
+  "fingerprint": "65f80d16998128bd4fc72cf52489e1135e9d4b39a2dd28462f5879077bc386bb",
+  "seconds": 241.12057579500015,
+  "architecture": "Alpha158 + five stock gates + category market-set encoders + MLP",
+  "pooling": "mean embeddings of all active market rows per category, plus log(1 + count) and category missing flag",
+  "normalization": "finite values in train segment only; unseen stock sensitivities = 1",
+  "missing_semantics": {
+    "factor": "1 for non-finite values; 0 for finite values, including zero",
+    "category": "1 if no real market row has any finite factor; 0 otherwise",
+    "padding": "excluded from pooling, counts and category availability",
+    "values": "missing values filled with 0 after normalization; only values scaled by stock sensitivities"
+  },
+  "training_polymarket_coverage": {
+    "quoted_market_rows": 6214,
+    "quoted_days": 117,
+    "category_rows": {
+      "direction": 64,
+      "threshold": 506,
+      "touch": 4392,
+      "range": 1088,
+      "record": 164
+    },
+    "first_quoted_date": "2025-12-29",
+    "last_quoted_date": "2026-06-26",
+    "active_market_rows": 6224,
+    "active_days": 117,
+    "category_active_rows": {
+      "direction": 64,
+      "threshold": 506,
+      "touch": 4402,
+      "range": 1088,
+      "record": 164
+    },
+    "category_missing_days": {
+      "direction": 4426,
+      "threshold": 4444,
+      "touch": 4373,
+      "range": 4373,
+      "record": 4418
+    }
+  },
+  "label": "cross-sectional zscore of close(T+2)/close(T+1)-1",
+  "membership_source": "baostock",
+  "membership_note": "BaoStock historical CSI 300 snapshots update weekly. Files are queried as of each trading date; updateDate is retained and is not an official index effective date."
+}

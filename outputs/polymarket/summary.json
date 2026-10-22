@@ -1,0 +1,15 @@
+{
+  "ic_mean": 0.022371806516206027,
+  "ic_std": 0.1956111201251447,
+  "ic_ir": 0.11436878691709029,
+  "rank_ic_mean": 0.01114214056285709,
+  "prediction_days": 125,
+  "evaluated_days": 123,
+  "evaluated_samples": 36849,
+  "training_scheme": "expanding_monthly_fixed_epochs",
+  "fingerprint": "65f80d16998128bd4fc72cf52489e1135e9d4b39a2dd28462f5879077bc386bb",
+  "months": 6,
+  "prediction_samples": 37500,
+  "membership_source": "baostock",
+  "membership_note": "BaoStock historical CSI 300 snapshots update weekly. Files are queried as of each trading date; updateDate is retained and is not an official index effective date."
+}
